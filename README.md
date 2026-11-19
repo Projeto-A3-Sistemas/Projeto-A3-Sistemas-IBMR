@@ -62,12 +62,12 @@ Para recriar o banco do zero (apaga os dados): `docker compose down -v`
 
 | Papel | Responsável |
 |---|---|
-| P1 — Arquitetura, segurança (login) e integração entre APIs | |
+| P1 — Arquitetura, segurança (login) e integração entre APIs | João |
 | P2 — Banco de dados | Grazzie |
 | P3 — Backend da API privada | Gabriel |
-| P4 — API governamental e integrações | |
-| P5 — Frontend | |
-| P6 — QA, testes e documentação | |
+| P4 — API governamental e integrações | Kailanny |
+| P5 — Frontend | João V |
+| P6 — QA, testes e documentação | Lili |
 
 ## Como trabalhar no Git
 
