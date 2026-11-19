@@ -1,0 +1,24 @@
+from datetime import datetime
+
+from sqlalchemy import DateTime, ForeignKey, Integer, String, Text, func
+from sqlalchemy.orm import Mapped, mapped_column
+
+from app.db.session import Base
+
+
+class IntegracaoGoverno(Base):
+    """Cada linha é uma comunicação a ser enviada à API governamental (Milestone 4)."""
+
+    __tablename__ = "integracao_governo"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    animal_id: Mapped[int] = mapped_column(ForeignKey("animal.id"))
+    vacina_id: Mapped[int | None] = mapped_column(ForeignKey("vacina.id"))
+    tipo_operacao: Mapped[str] = mapped_column(String(30))
+    protocolo_externo: Mapped[str | None] = mapped_column(String(50))
+    chave_idempotencia: Mapped[str] = mapped_column(String(100), unique=True)
+    situacao: Mapped[str] = mapped_column(String(12), server_default="pendente")
+    data_solicitacao: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+    data_resposta: Mapped[datetime | None] = mapped_column(DateTime)
+    tentativas: Mapped[int] = mapped_column(Integer, server_default="0")
+    mensagem_erro: Mapped[str | None] = mapped_column(Text)
