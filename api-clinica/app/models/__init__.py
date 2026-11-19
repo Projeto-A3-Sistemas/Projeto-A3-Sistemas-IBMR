@@ -10,5 +10,11 @@ from app.models.raca import Raca
 from app.models.tutor import Tutor
 from app.models.veterinario import Veterinario
 from app.models.animal import Animal
+from app.models.consulta import Consulta
+from app.models.vacina import Vacina
+from app.models.integracao_governo import IntegracaoGoverno
 
-__all__ = ["Base", "Endereco", "Especie", "Raca", "Tutor", "Veterinario", "Animal"]
+__all__ = [
+    "Base", "Endereco", "Especie", "Raca", "Tutor", "Veterinario", "Animal",
+    "Consulta", "Vacina", "IntegracaoGoverno",
+]

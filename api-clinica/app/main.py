@@ -40,11 +40,13 @@ def health():
 
 
 # ---- Rotas dos modulos ----
-from app.routers import animais, tutores, veterinarios  # noqa: E402
+from app.routers import animais, consultas, tutores, vacinas, veterinarios  # noqa: E402
 
 app.include_router(tutores.router)
 app.include_router(animais.router)
 app.include_router(veterinarios.router)
+app.include_router(consultas.router)
+app.include_router(vacinas.router)
 
 # Descomente quando as outras partes estiverem prontas:
 # from app.routers import auth, especies, racas
