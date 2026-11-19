@@ -1,0 +1,77 @@
+# SDM - Sistema de Gestao de Clinica Veterinaria
+# Sobe tudo com:  docker compose up --build
+#
+#   db-clinica   PostgreSQL da clinica      -> localhost:5432
+#   db-governo   PostgreSQL do governo      -> localhost:5433
+#   api-clinica  API privada (FastAPI)      -> http://localhost:8000/docs
+#   api-governo  API governamental simulada -> http://localhost:8001/docs
+#
+# Os scripts de db/clinica rodam sozinhos na PRIMEIRA vez que o banco sobe.
+# Para recriar o banco do zero:  docker compose down -v
+
+services:
+  db-clinica:
+    image: postgres:18
+    container_name: sdm-db-clinica
+    environment:
+      POSTGRES_DB: ${CLINICA_DB_NAME:-clinica_db}
+      POSTGRES_USER: ${CLINICA_DB_USER:-postgres}
+      POSTGRES_PASSWORD: ${CLINICA_DB_PASSWORD:-postgres}
+      TZ: America/Sao_Paulo
+    ports:
+      - "${CLINICA_DB_PORT:-5432}:5432"
+    volumes:
+      - ./db/clinica:/docker-entrypoint-initdb.d:ro
+      - clinica_data:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  db-governo:
+    image: postgres:18
+    container_name: sdm-db-governo
+    environment:
+      POSTGRES_DB: ${GOVERNO_DB_NAME:-governo_db}
+      POSTGRES_USER: ${GOVERNO_DB_USER:-postgres}
+      POSTGRES_PASSWORD: ${GOVERNO_DB_PASSWORD:-postgres}
+      TZ: America/Sao_Paulo
+    ports:
+      - "${GOVERNO_DB_PORT:-5433}:5432"
+    volumes:
+      - ./db/governo:/docker-entrypoint-initdb.d:ro
+      - governo_data:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  api-clinica:
+    build: ./api-clinica
+    container_name: sdm-api-clinica
+    environment:
+      DATABASE_URL: postgresql+psycopg://${CLINICA_DB_USER:-postgres}:${CLINICA_DB_PASSWORD:-postgres}@db-clinica:5432/${CLINICA_DB_NAME:-clinica_db}
+      JWT_SECRET: ${JWT_SECRET:-troque-esta-chave}
+      GOVERNO_API_URL: http://api-governo:8001
+    ports:
+      - "8000:8000"
+    depends_on:
+      db-clinica:
+        condition: service_healthy
+
+  api-governo:
+    build: ./api-governo
+    container_name: sdm-api-governo
+    environment:
+      GOVERNO_DATABASE_URL: postgresql+psycopg://${GOVERNO_DB_USER:-postgres}:${GOVERNO_DB_PASSWORD:-postgres}@db-governo:5432/${GOVERNO_DB_NAME:-governo_db}
+    ports:
+      - "8001:8001"
+    depends_on:
+      db-governo:
+        condition: service_healthy
+
+volumes:
+  clinica_data:
+  governo_data:
