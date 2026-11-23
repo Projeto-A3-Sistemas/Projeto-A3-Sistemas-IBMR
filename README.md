@@ -1,6 +1,6 @@
 # SDM — Sistema de Gestão de Clínica Veterinária
 
-Projeto Integrador A3 — Sistemas Distribuídos e Mobile (IBMR).
+Projeto Integrador A3 — Sistemas Distribuídos e Mobile (IBMR). Entrega: 26/11/2026.
 
 Sistema web para clínica veterinária com três serviços que se comunicam por HTTP:
 
@@ -10,12 +10,15 @@ Sistema web para clínica veterinária com três serviços que se comunicam por 
 | API governamental **simulada** (FastAPI) | `api-governo/` | http://localhost:8001/docs |
 | Frontend web (React + Vite) | `frontend/` | http://localhost:5173 |
 
-A API privada também consome a API pública **ViaCEP**. Todos os dados são fictícios
-e a API governamental é simulada (não é integração oficial).
+A API da clínica também consome a API pública **ViaCEP**. Todos os dados são fictícios, e a API
+governamental é simulada (não é integração oficial).
 
-## Como rodar
+Documentação: [arquitetura](docs/arquitetura.md) · [tecnologias](docs/tecnologias.md) ·
+[contrato da integração](docs/contrato-integracao-governo.md) · [fluxo no Git](docs/fluxo-git.md)
 
-Precisa ter o **Docker Desktop** aberto.
+## Como rodar (Docker)
+
+Precisa do **Docker Desktop** aberto.
 
 ```bash
 # 1. Criar o arquivo de configuração (só na primeira vez)
@@ -26,13 +29,77 @@ copy .env.example .env        # Windows
 docker compose up --build
 ```
 
-Depois abra http://localhost:8000/docs (Swagger da API da clínica) e
-http://localhost:8000/health (deve mostrar `"banco": "ok"`).
+Na primeira vez, os scripts de `db/clinica` e `db/governo` criam as tabelas e os dados de teste
+sozinhos. Para recriar tudo do zero (apaga os dados): `docker compose down -v`.
 
-> Já tem PostgreSQL instalado no PC usando a porta 5432? No `.env`, troque
-> `CLINICA_DB_PORT=5432` por `CLINICA_DB_PORT=5434`.
+Confira se subiu: http://localhost:8000/health e http://localhost:8001/health devem mostrar
+`"banco": "ok"`.
 
-Para recriar o banco do zero (apaga os dados): `docker compose down -v`
+> Já tem PostgreSQL instalado usando a porta 5432? No `.env`, troque `CLINICA_DB_PORT=5432`
+> por `CLINICA_DB_PORT=5434`.
+
+## Como rodar sem Docker (VS Code)
+
+1. Instale o PostgreSQL 17 ou 18. Crie dois bancos: `clinica_db` e `governo_db`.
+2. Rode os scripts **em ordem**, cada um no seu banco (pgAdmin ou `psql`):
+   - `clinica_db`: `db/clinica/01_criar_tabelas.sql`, `02_dados_teste.sql`, `03_sessoes.sql`, `04_senhas_teste.sql`
+   - `governo_db`: `db/governo/01_schema.sql`, `02_dados_teste.sql`
+3. Copie `.env.example` para `.env`. Como os dois bancos ficam no mesmo PostgreSQL, ajuste
+   `GOVERNO_DATABASE_URL` para a porta `5432` e coloque a sua senha nas duas URLs.
+4. Em dois terminais:
+
+```bash
+cd api-governo
+python -m venv .venv && .venv\Scripts\activate      # Linux/Mac: source .venv/bin/activate
+pip install -r requirements.txt
+uvicorn app.main:app --port 8001 --reload
+```
+
+```bash
+cd api-clinica
+python -m venv .venv && .venv\Scripts\activate
+pip install -r requirements.txt
+uvicorn app.main:app --port 8000 --reload
+```
+
+## Login e uso no Swagger
+
+Todas as rotas da API da clínica exigem login, menos `/health` e `/api/auth/...`.
+
+1. Abra http://localhost:8000/docs.
+2. `POST /api/auth/login` com `{"email": "ana@clinica.com", "senha": "Senha@123"}`.
+3. Copie o `access_token`, clique em **Authorize** (cadeado) e cole.
+
+Veterinários de teste (senha `Senha@123` para todos):
+
+| E-mail | Situação | Resultado do login |
+|---|---|---|
+| `ana@clinica.com` | ativa, senha confirmada | entra |
+| `carlos@clinica.com` | inativo | 403 (teste 2) |
+| `beatriz@clinica.com` | senha não confirmada | 403 (teste 3) até confirmar |
+
+Para confirmar a senha da Beatriz: `POST /api/auth/solicitar-confirmacao` (o "e-mail" é simulado
+e o token volta na resposta) e depois `POST /api/auth/confirmar-senha` com esse token.
+
+Frontend: mandar o cabeçalho `Authorization: Bearer <access_token>` em todas as chamadas.
+
+## Testes
+
+```bash
+# testes automáticos, sem banco nem Docker
+cd api-clinica
+pip install -r requirements.txt pytest
+python -m pytest -v
+cd ../api-governo
+python -m pytest -v
+cd ..
+
+# teste ponta a ponta (APIs no ar e banco recém-criado)
+pip install httpx
+python tests/integracao/teste_ponta_a_ponta.py
+```
+
+A coleção do Postman e as evidências ficam em `tests/postman/`.
 
 ## Estrutura
 
@@ -44,18 +111,22 @@ Para recriar o banco do zero (apaga os dados): `docker compose down -v`
 │   ├── clinica/           # scripts do banco da clínica (rodam sozinhos no Docker)
 │   └── governo/           # scripts do banco do governo
 ├── api-clinica/           # API privada (FastAPI)
-│   └── app/
-│       ├── main.py        # ponto de entrada; registre aqui os routers
-│       ├── core/          # configurações
-│       ├── db/            # conexão com o banco (get_db)
-│       ├── models/        # tabelas (SQLAlchemy)
-│       ├── schemas/       # entrada/saída (Pydantic)
-│       ├── routers/       # endpoints
-│       └── services/      # regras de negócio
+│   ├── app/
+│   │   ├── main.py        # ponto de entrada; registra as rotas e exige login
+│   │   ├── deps.py        # checagem do login (protege as rotas)
+│   │   ├── core/          # configurações, senha e tokens
+│   │   ├── db/            # conexão com o banco (get_db)
+│   │   ├── models/        # tabelas (SQLAlchemy)
+│   │   ├── schemas/       # entrada/saída (Pydantic)
+│   │   ├── routers/       # endpoints
+│   │   └── services/      # regras de negócio, ViaCEP, envio ao governo e reenvio
+│   └── tests/
 ├── api-governo/           # API governamental simulada (FastAPI)
 ├── frontend/              # interface web (React + Vite)
 ├── docs/                  # requisitos, diagramas, arquitetura
-└── tests/postman/         # coleção de testes do Postman
+└── tests/
+    ├── integracao/        # teste ponta a ponta
+    └── postman/           # coleção do Postman
 ```
 
 ## Equipe
@@ -75,14 +146,4 @@ Para recriar o banco do zero (apaga os dados): `docker compose down -v`
 - `develop`: integração — **crie sua branch a partir dela**
 - `feature/<sua-parte>`: sua branch (ex.: `feature/tutores`)
 
-```bash
-git checkout develop
-git pull
-git checkout -b feature/sua-parte
-# ...trabalhe...
-git add .
-git commit -m "feat: descricao do que fez"
-git push -u origin feature/sua-parte
-```
-
-Depois abra um **Pull Request para `develop`** no GitHub.
+Detalhes e checklist de revisão em [docs/fluxo-git.md](docs/fluxo-git.md).
