@@ -76,7 +76,7 @@ function Sidebar({ section, logout }) {
   </aside>
 }
 
-function ConfirmDeactivate({ record, onClose, onConfirm }) {
+function ConfirmationDialog({ title, description, actionLabel, onClose, onConfirm }) {
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
   async function confirm() {
@@ -89,13 +89,13 @@ function ConfirmDeactivate({ record, onClose, onConfirm }) {
       setBusy(false)
     }
   }
-  return <Modal title="Inativar cadastro" onClose={onClose} busy={busy}>
+  return <Modal title={title} onClose={onClose} busy={busy}>
     <div className="editor">
-      <p>Inativar o cadastro de <strong>{record.nome ?? record.nome_completo}</strong>? O histórico será preservado.</p>
+      <p>{description}</p>
       {error && <p className="notice notice--error" role="alert">{error}</p>}
       <div className="modal-actions">
-        <Button variant="secondary" disabled={busy} onClick={onClose}>Cancelar</Button>
-        <Button variant="danger" disabled={busy} onClick={confirm}>{busy ? 'Inativando…' : 'Inativar cadastro'}</Button>
+        <Button variant="secondary" disabled={busy} onClick={onClose}>Voltar</Button>
+        <Button variant="danger" disabled={busy} onClick={confirm}>{busy ? 'Processando…' : actionLabel}</Button>
       </div>
     </div>
   </Modal>
@@ -141,25 +141,49 @@ function ClinicWorkspace({ logout }) {
     return () => window.removeEventListener('hashchange', update)
   }, [])
 
-  const edit = (kind, record, animalId, day) => {
+  const edit = (kind, record, options = {}) => {
     setMessage('')
-    setEditor({ kind, record, animalId, day })
+    setEditor({ kind, record, ...options })
   }
   const deactivate = (resource, record) => {
     setMessage('')
-    setConfirmation({ resource, record })
+    setConfirmation({
+      title: 'Inativar cadastro', actionLabel: 'Inativar cadastro',
+      description: <>Inativar o cadastro de <strong>{record.nome ?? record.nome_completo}</strong>? O histórico será preservado.</>,
+      run: () => repository.deactivate(resource, record.id),
+      success: 'Cadastro inativado.',
+    })
+  }
+  const cancelAppointment = (record) => {
+    setMessage('')
+    setConfirmation({
+      title: 'Cancelar consulta', actionLabel: 'Confirmar cancelamento',
+      description: <>Cancelar a consulta de <strong>{record.animal.nome}</strong>? Ela continuará no histórico como cancelada.</>,
+      run: () => repository.cancelAppointment(record.id),
+      success: 'Consulta cancelada.',
+    })
+  }
+  const cancelVaccine = (record) => {
+    setMessage('')
+    setConfirmation({
+      title: 'Cancelar agendamento de vacina', actionLabel: 'Confirmar cancelamento',
+      description: <>Cancelar o agendamento de <strong>{record.nome_vacina}</strong> para <strong>{record.animal.nome}</strong>? O registro continuará no histórico como cancelado.</>,
+      run: () => repository.cancelVaccine(record.id),
+      success: 'Agendamento de vacina cancelado.',
+    })
   }
   async function save(input) {
     const { kind, record } = editor
     if (kind === 'microchip') await repository.linkChip(record.id, input)
     else await repository[saveMethods[kind]](input, record?.id)
     await load()
-    setMessage(kind === 'microchip' ? 'Vínculo de microchip registrado.' : 'Registro salvo.')
+    const messages = { microchip: 'Vínculo de microchip registrado.', consulta: 'Consulta salva.', vacina: 'Vacina salva.' }
+    setMessage(messages[kind] ?? 'Registro salvo.')
   }
-  async function confirmDeactivate() {
-    await repository.deactivate(confirmation.resource, confirmation.record.id)
+  async function confirmAction() {
+    await confirmation.run()
     await load()
-    setMessage('Cadastro inativado.')
+    setMessage(confirmation.success)
   }
   async function retry(id) {
     await repository.retryIntegration(id)
@@ -169,9 +193,9 @@ function ClinicWorkspace({ logout }) {
 
   const pages = {
     tutores: <TutorsPage data={data} edit={edit} deactivate={deactivate} />,
-    animais: route.id ? <AnimalPage data={data} edit={edit} deactivate={deactivate} navigate={navigate} id={route.id} tab={route.tab} /> : <AnimalsPage data={data} edit={edit} />,
-    consultas: <ConsultationsPage data={data} edit={edit} />,
-    vacinas: <VaccinesPage data={data} edit={edit} />,
+    animais: route.id ? <AnimalPage data={data} edit={edit} deactivate={deactivate} cancelAppointment={cancelAppointment} cancelVaccine={cancelVaccine} navigate={navigate} id={route.id} tab={route.tab} /> : <AnimalsPage data={data} edit={edit} />,
+    consultas: <ConsultationsPage data={data} edit={edit} cancelAppointment={cancelAppointment} />,
+    vacinas: <VaccinesPage data={data} edit={edit} cancelVaccine={cancelVaccine} />,
     integracoes: <IntegrationsPage data={data} selectedId={route.id} navigate={navigate} retry={retry} />,
   }
 
@@ -190,7 +214,7 @@ function ClinicWorkspace({ logout }) {
       </div>
     </main>
     {editor && <ClinicEditor editor={editor} data={data} onClose={() => setEditor(null)} onSave={save} />}
-    {confirmation && <ConfirmDeactivate record={confirmation.record} onClose={() => setConfirmation(null)} onConfirm={confirmDeactivate} />}
+    {confirmation && <ConfirmationDialog title={confirmation.title} description={confirmation.description} actionLabel={confirmation.actionLabel} onClose={() => setConfirmation(null)} onConfirm={confirmAction} />}
   </div>
 }
 

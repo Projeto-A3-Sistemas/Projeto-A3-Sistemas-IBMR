@@ -1,7 +1,7 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { demoDate } from '../clinic/demoData.js'
 import { appointmentDay, digits, formatChip, formatCpf, formatDate, formatPhone, formatTime, localDate, matches } from '../clinic/format.js'
-import { isDemo } from '../clinic/repository.js'
+import { isDemo, repository } from '../clinic/repository.js'
 import { Button, DataTable, DateText, Icon, KeyValues, PageHeader, PetAvatar, Search, Status, Tabs } from './ui.jsx'
 
 const find = (records, id) => records.find((record) => record.id === Number(id))
@@ -30,7 +30,7 @@ export function TutorsPage({ data, edit, deactivate }) {
 
   return <>
     <PageHeader title="Tutores" description="Cadastros dos responsáveis pelos animais.">
-      <Button icon="plus" onClick={() => edit('tutor')} disabled={!isDemo && !data.tutors.some((item) => item.endereco)}>Novo tutor</Button>
+      <Button icon="plus" onClick={() => edit('tutor')}>Novo tutor</Button>
     </PageHeader>
     <section className="panel directory-panel">
       <div className="toolbar">
@@ -88,7 +88,7 @@ export function AnimalsPage({ data, edit }) {
   </>
 }
 
-function AppointmentDetails({ record, data, edit, showAnimalLink = true }) {
+function AppointmentDetails({ record, data, edit, cancelAppointment, showAnimalLink = true }) {
   if (!record) return <p className="empty">Selecione uma consulta para ver os detalhes.</p>
   const animal = find(data.animals, record.animal.id)
   return <>
@@ -98,6 +98,7 @@ function AppointmentDetails({ record, data, edit, showAnimalLink = true }) {
     </div>
     <div className="detail-person"><strong>{record.veterinario?.nome_completo}</strong>{animal?.tutor && <p className="muted">{animal.tutor.nome_completo} · Tutor responsável</p>}</div>
     <KeyValues items={[
+      ['Data e hora', `${formatDate(appointmentDay(record.data_hora))} às ${formatTime(record.data_hora)}`],
       ['Motivo', record.motivo],
       ['Peso', record.peso ? `${Number(record.peso).toLocaleString('pt-BR')} kg` : null],
       ['Temperatura', record.temperatura ? `${Number(record.temperatura).toLocaleString('pt-BR')} °C` : null],
@@ -105,8 +106,10 @@ function AppointmentDetails({ record, data, edit, showAnimalLink = true }) {
       ['Tratamento', record.tratamento], ['Prescrição', record.prescricao], ['Observações', record.observacoes],
     ].filter(([, value]) => value)} />
     <div className="actions">
+      {record.situacao === 'agendada' && <Button onClick={() => edit('consulta', record, { completeAppointment: true })}>Registrar atendimento</Button>}
       {showAnimalLink && <a className="button button--secondary" href={animalPath(record.animal.id, 'consultas')}>Abrir ficha do animal</a>}
       <Button variant="quiet" icon="edit" onClick={() => edit('consulta', record)}>Editar consulta</Button>
+      {record.situacao === 'agendada' && <Button variant="secondary" onClick={() => cancelAppointment(record)}>Cancelar consulta</Button>}
     </div>
   </>
 }
@@ -121,37 +124,41 @@ function AppointmentList({ records, selected, select, showDates = false }) {
   </div>
 }
 
-export function ConsultationsPage({ data, edit }) {
+export function ConsultationsPage({ data, edit, cancelAppointment }) {
   const [day, setDay] = useState(isDemo ? demoDate : localDate())
   const [selectedId, select] = useState(null)
   const records = data.appointments.filter((record) => appointmentDay(record.data_hora) === day)
     .sort((a, b) => formatTime(a.data_hora).localeCompare(formatTime(b.data_hora)))
   const selected = find(records, selectedId) ?? records[0]
   return <>
-    <PageHeader title="Consultas"><Button icon="plus" onClick={() => edit('consulta', null, null, day)} disabled={!data.animals.some((item) => item.situacao === 'ativo') || !data.vets.length}>Nova consulta</Button></PageHeader>
+    <PageHeader title="Consultas"><Button icon="plus" onClick={() => edit('consulta', null, { day })} disabled={!data.animals.some((item) => item.situacao === 'ativo') || !data.vets.length}>Nova consulta</Button></PageHeader>
     <div className="date-strip"><div><Icon name="calendar" /><strong>{formatDate(day, true)}</strong></div>
       <input type="date" aria-label="Data da agenda" value={day} onChange={(event) => { if (event.target.value) setDay(event.target.value) }} />
     </div>
     <div className="split split--agenda">
       <section className="panel work-panel"><h2>Atendimentos do dia</h2><AppointmentList records={records} selected={selected} select={select} /></section>
-      <section className="panel work-panel"><AppointmentDetails record={selected} data={data} edit={edit} /></section>
+      <section className="panel work-panel"><AppointmentDetails record={selected} data={data} edit={edit} cancelAppointment={cancelAppointment} /></section>
     </div>
   </>
 }
 
-function VaccineTable({ records, edit, showAnimal = true }) {
+function VaccineTable({ records, edit, cancelVaccine, showAnimal = true, empty = 'Nenhum registro de vacinação encontrado.' }) {
   const columns = [
     ...(showAnimal ? [{ key: 'animal', label: 'Animal', render: (record) => <a className="text-link" href={animalPath(record.animal.id, 'vacinas')}>{record.animal.nome}</a> }] : []),
     { key: 'name', label: 'Vacina', render: (record) => <strong>{record.nome_vacina}</strong> },
     { key: 'applied', label: 'Aplicação', render: (record) => <DateText value={record.data_aplicacao} /> },
     { key: 'next', label: 'Próxima dose', render: (record) => <DateText value={record.data_proxima_dose} /> },
     { key: 'status', label: 'Situação', render: (record) => <Status value={record.situacao} /> },
-    { key: 'action', label: '', render: (record) => <button type="button" className="text-link" onClick={() => edit('vacina', record)} aria-label={`Editar vacina ${record.nome_vacina} de ${record.animal.nome}`}>Editar</button> },
+    { key: 'action', label: '', render: (record) => <div className="actions vaccine-actions">
+      {record.situacao === 'agendada' && <button type="button" className="text-link" onClick={() => edit('vacina', record, { applyVaccine: true })}>Registrar aplicação</button>}
+      <button type="button" className="text-link" onClick={() => edit('vacina', record)} aria-label={`Editar vacina ${record.nome_vacina} de ${record.animal.nome}`}>Editar</button>
+      {record.situacao === 'agendada' && <button type="button" className="text-link" onClick={() => cancelVaccine(record)}>Cancelar agendamento</button>}
+    </div> },
   ]
-  return <DataTable columns={columns} rows={records} label="Registros de vacinação" empty="Nenhum registro de vacinação encontrado." />
+  return <DataTable columns={columns} rows={records} label="Registros de vacinação" empty={empty} />
 }
 
-export function VaccinesPage({ data, edit }) {
+export function VaccinesPage({ data, edit, cancelVaccine }) {
   const [tab, setTab] = useState('records')
   const [query, setQuery] = useState('')
   const records = data.vaccines.filter((record) => (
@@ -166,7 +173,7 @@ export function VaccinesPage({ data, edit }) {
     <section className="panel directory-panel vaccine-panel">
       <Tabs label="Visão de vacinação" value={tab} onChange={setTab} items={ [['records', 'Aplicações'], ['next', 'Próximas doses']] } />
       <Search label="Buscar por animal ou vacina" value={query} onChange={setQuery} />
-      <VaccineTable records={records} edit={edit} />
+      <VaccineTable records={records} edit={edit} cancelVaccine={cancelVaccine} empty={tab === 'next' ? 'Nenhuma próxima dose encontrada.' : undefined} />
       {pending && <div className="notice notice--warning vaccine-notice">
         <div><strong>{pending.animal.nome} · Comunicação antirrábica</strong><Status value={pending.situacao} /></div>
         <a className="button button--secondary" href={integrationPath(pending.id)}>Ver integração</a>
@@ -238,29 +245,65 @@ function ChipHistory({ animal, edit }) {
   </section>
 }
 
-function AnimalConsultations({ animal, data, edit }) {
+function useAnimalHistory(animalId, records, list) {
+  const [history, setHistory] = useState(null)
+  const [error, setError] = useState('')
+  const [reload, setReload] = useState(0)
+
+  useEffect(() => {
+    if (isDemo) return
+    let current = true
+    setError('')
+    list(animalId).then((result) => {
+      if (current) setHistory(result)
+    }).catch((error) => {
+      if (current) setError(error.message)
+    })
+    return () => { current = false }
+  }, [animalId, records, list, reload])
+
+  return {
+    items: isDemo ? records.filter((record) => record.animal.id === animalId) : history ?? [],
+    loading: !isDemo && !history,
+    error,
+    retry: () => setReload((value) => value + 1),
+  }
+}
+
+function HistoryFeedback({ history }) {
+  if (history.error) return <div className="notice notice--error" role="alert">
+    <p>Não foi possível carregar o histórico. {history.error}</p>
+    <Button variant="secondary" onClick={history.retry}>Tentar novamente</Button>
+  </div>
+  return <p className="empty" role="status">Carregando histórico…</p>
+}
+
+function AnimalConsultations({ animal, data, edit, cancelAppointment }) {
   const [selectedId, select] = useState(null)
-  const records = data.appointments.filter((record) => record.animal.id === animal.id)
-    .sort((a, b) => new Date(b.data_hora) - new Date(a.data_hora))
+  const history = useAnimalHistory(animal.id, data.appointments, repository.listAnimalAppointments)
+  const records = [...history.items].sort((a, b) => new Date(b.data_hora) - new Date(a.data_hora))
   const selected = find(records, selectedId) ?? records[0]
   return <div className="split split--agenda">
     <section className="panel work-panel">
-      <div className="section-header"><h2>Histórico de consultas</h2><Button icon="plus" disabled={animal.situacao !== 'ativo' || !data.vets.length} onClick={() => edit('consulta', null, animal.id)}>Nova consulta</Button></div>
-      <AppointmentList records={records} selected={selected} select={select} showDates />
+      <div className="section-header"><h2>Histórico de consultas</h2><Button icon="plus" disabled={animal.situacao !== 'ativo' || !data.vets.length} onClick={() => edit('consulta', null, { animalId: animal.id, day: isDemo ? demoDate : localDate() })}>Nova consulta</Button></div>
+      {history.error || history.loading ? <HistoryFeedback history={history} /> :
+        <AppointmentList records={records} selected={selected} select={select} showDates />}
     </section>
-    <section className="panel work-panel"><AppointmentDetails record={selected} data={data} edit={edit} showAnimalLink={false} /></section>
+    <section className="panel work-panel"><AppointmentDetails record={history.error ? null : selected} data={data} edit={edit} cancelAppointment={cancelAppointment} showAnimalLink={false} /></section>
   </div>
 }
 
-function AnimalVaccines({ animal, data, edit }) {
-  const records = data.vaccines.filter((record) => record.animal.id === animal.id)
+function AnimalVaccines({ animal, data, edit, cancelVaccine }) {
+  const history = useAnimalHistory(animal.id, data.vaccines, repository.listAnimalVaccines)
+  const records = [...history.items]
     .sort((a, b) => (b.data_aplicacao ?? '').localeCompare(a.data_aplicacao ?? ''))
   const communication = data.integrations.find((record) => record.animal.id === animal.id && record.vacina_id && record.situacao === 'pendente')
     ?? data.integrations.find((record) => record.animal.id === animal.id && record.vacina_id)
   return <div className="split split--vaccine">
     <section className="panel work-panel">
-      <div className="section-header"><h2>Histórico de vacinação</h2><Button icon="plus" disabled={animal.situacao !== 'ativo' || !data.vets.length} onClick={() => edit('vacina', null, animal.id)}>Nova vacina</Button></div>
-      <VaccineTable records={records} edit={edit} showAnimal={false} />
+      <div className="section-header"><h2>Histórico de vacinação</h2><Button icon="plus" disabled={animal.situacao !== 'ativo' || !data.vets.length} onClick={() => edit('vacina', null, { animalId: animal.id })}>Nova vacina</Button></div>
+      {history.error || history.loading ? <HistoryFeedback history={history} /> :
+        <VaccineTable records={records} edit={edit} cancelVaccine={cancelVaccine} showAnimal={false} />}
     </section>
     <section className="panel work-panel">
       <h2>Comunicação governamental</h2>
@@ -276,7 +319,7 @@ function AnimalVaccines({ animal, data, edit }) {
 
 const animalTabs = [['resumo', 'Resumo'], ['consultas', 'Consultas'], ['vacinas', 'Vacinas'], ['microchip', 'Microchip']]
 
-export function AnimalPage({ id, tab, data, edit, navigate, deactivate }) {
+export function AnimalPage({ id, tab, data, edit, navigate, deactivate, cancelAppointment, cancelVaccine }) {
   const animal = find(data.animals, id)
   if (!animal) return <><PageHeader title="Ficha do animal" /><section className="panel work-panel"><p>Animal não encontrado.</p><a className="text-link" href="#/animais">Voltar para animais</a></section></>
   const current = animalTabs.some(([key]) => key === tab) ? tab : 'resumo'
@@ -306,8 +349,8 @@ export function AnimalPage({ id, tab, data, edit, navigate, deactivate }) {
         ['Peso atual', animal.peso_atual ? `${Number(animal.peso_atual).toLocaleString('pt-BR')} kg` : null],
       ]} />
     </section>}
-    {current === 'consultas' && <AnimalConsultations key={animal.id} animal={animal} data={data} edit={edit} />}
-    {current === 'vacinas' && <AnimalVaccines animal={animal} data={data} edit={edit} />}
+    {current === 'consultas' && <AnimalConsultations key={animal.id} animal={animal} data={data} edit={edit} cancelAppointment={cancelAppointment} />}
+    {current === 'vacinas' && <AnimalVaccines key={animal.id} animal={animal} data={data} edit={edit} cancelVaccine={cancelVaccine} />}
     {current === 'microchip' && <ChipHistory animal={animal} edit={edit} />}
   </>
 }

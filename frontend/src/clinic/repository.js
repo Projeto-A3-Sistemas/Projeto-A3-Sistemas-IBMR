@@ -9,6 +9,8 @@ const endpoints = {
   vets: ['/api/veterinarios', 'veterinários'],
   appointments: ['/api/consultas', 'consultas'],
   vaccines: ['/api/vacinas', 'vacinas'],
+  species: ['/api/especies', 'espécies'],
+  breeds: ['/api/racas', 'raças'],
 }
 
 export const emptyData = {
@@ -45,7 +47,19 @@ function save(resource, body, id) {
   return request(id ? `${path}/${id}` : path, { method: id ? 'PUT' : 'POST', body })
 }
 
+async function listAnimalRecords(resource, animalId) {
+  const [path] = endpoints[resource]
+  const history = await request(`${path}?animal_id=${animalId}`)
+  if (!Array.isArray(history)) throw new Error('A API retornou um histórico inválido.')
+  return history
+}
+
 const apiRepository = {
+  async lookupCep(cep) {
+    const { logradouro, complemento, bairro, cidade, uf, codigo_ibge } = await request(`/api/cep/${cep}`)
+    return { logradouro, complemento, bairro, cidade, uf, ibge: codigo_ibge }
+  },
+
   async load() {
     const resources = Object.entries(endpoints)
     const results = await Promise.allSettled(resources.map(([key, [path]]) =>
@@ -57,24 +71,22 @@ const apiRepository = {
       if (result.status === 'fulfilled' && Array.isArray(result.value)) data[key] = result.value
       else data.errors.push(`Não foi possível carregar ${label}. ${result.reason?.message ?? 'Resposta inesperada.'}`)
     })
-    // The PR exposes nested catalog references but no catalog list routes.
-    const species = new Map()
-    const breeds = new Map()
-    for (const animal of data.animals) {
-      if (animal.especie) species.set(animal.especie.id, animal.especie)
-      if (animal.raca && animal.especie) breeds.set(animal.raca.id, { ...animal.raca, especie_id: animal.especie.id })
-    }
-    data.species = [...species.values()]
-    data.breeds = [...breeds.values()]
     return data
   },
   saveTutor({ endereco, ...body }, id) {
     if (id) delete body.cpf
     return save('tutors', body, id)
   },
+  createAddress({ ibge, ...address }) {
+    return request('/api/enderecos', { method: 'POST', body: { ...address, codigo_ibge: ibge || null } })
+  },
   saveAnimal: (body, id) => save('animals', body, id),
   saveAppointment: (body, id) => save('appointments', body, id),
+  listAnimalAppointments: (id) => listAnimalRecords('appointments', id),
+  cancelAppointment: (id) => request(`/api/consultas/${id}`, { method: 'DELETE' }),
   saveVaccine: (body, id) => save('vaccines', body, id),
+  listAnimalVaccines: (id) => listAnimalRecords('vaccines', id),
+  cancelVaccine: (id) => request(`/api/vacinas/${id}`, { method: 'DELETE' }),
   deactivate: (name, id) => request(`${endpoints[name][0]}/${id}`, { method: 'DELETE' }),
 }
 

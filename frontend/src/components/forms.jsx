@@ -1,4 +1,4 @@
-import { useId, useState } from 'react'
+import { useId, useRef, useState } from 'react'
 import { appointmentDay, digits, formatTime, localDate, validCpf } from '../clinic/format.js'
 import { isDemo, repository } from '../clinic/repository.js'
 import { Button, Modal } from './ui.jsx'
@@ -6,6 +6,11 @@ import { Button, Modal } from './ui.jsx'
 const ufOptions = 'AC AL AP AM BA CE DF ES GO MA MT MS MG PA PB PR PE PI RJ RN RS RO RR SC SP SE TO'.split(' ')
 const active = (records) => records.filter((record) => record.situacao === 'ativo')
 const options = (records, label) => records.map((record) => [record.id, record[label]])
+const addressFields = [
+  ['logradouro', 'Logradouro', 150, true], ['numero', 'Número', 10, true],
+  ['complemento', 'Complemento', 80, false], ['bairro', 'Bairro', 80, true],
+  ['cidade', 'Cidade', 80, true], ['ibge', 'Código IBGE', 7, false],
+]
 
 function Field({ label, ...props }) {
   const id = useId()
@@ -66,11 +71,16 @@ function TutorEditor({ record, data, onClose, onSave }) {
   const [address, setAddress] = useState(record?.endereco ?? {})
   const [cepMessage, setCepMessage] = useState('')
   const [lookingUp, setLookingUp] = useState(false)
+  const [cepFound, setCepFound] = useState(false)
   const addresses = [...new Map(data.tutors.filter((tutor) => tutor.endereco).map((tutor) => [tutor.endereco.id, tutor.endereco])).values()]
+  const [addressMode, setAddressMode] = useState(record?.endereco_id && !isDemo ? 'existing' : 'new')
+  const savedAddress = useRef(null)
   const setAddressField = (name, value) => setAddress((current) => ({ ...current, [name]: value }))
 
   async function lookup() {
+    if (lookingUp) return
     const currentCep = digits(address.cep)
+    setCepFound(false)
     if (currentCep.length !== 8) {
       setCepMessage('Informe um CEP de 8 dígitos.')
       return
@@ -79,8 +89,9 @@ function TutorEditor({ record, data, onClose, onSave }) {
     setCepMessage('')
     try {
       const result = await repository.lookupCep(currentCep)
-      setAddress((current) => digits(current.cep) === currentCep ? { ...current, ...result } : current)
-      setCepMessage('Endereço localizado na demonstração.')
+      setAddress((current) => ({ ...current, ...result }))
+      setCepFound(true)
+      setCepMessage(isDemo ? 'Endereço localizado na demonstração.' : 'Endereço localizado pelo ViaCEP.')
     } catch (error) {
       setCepMessage(error.message)
     } finally {
@@ -94,35 +105,72 @@ function TutorEditor({ record, data, onClose, onSave }) {
     if (!validCpf(cpf) && !record) throw new Error('Informe um CPF válido.')
     if (fields.data_nascimento >= localDate()) throw new Error('A data de nascimento deve estar no passado.')
     if (digits(fields.telefone).length < 10) throw new Error('Informe um telefone com DDD.')
-    if (isDemo && digits(address.cep).length !== 8) throw new Error('Informe um CEP de 8 dígitos.')
-    return {
+    const tutor = {
       nome_completo: fields.nome_completo.trim(), cpf, data_nascimento: fields.data_nascimento,
       email: fields.email.trim(), telefone: digits(fields.telefone),
-      ...(isDemo ? { endereco: { ...address, cep: digits(address.cep) } } : { endereco_id: Number(fields.endereco_id) }),
+    }
+    if (addressMode === 'existing') return { ...tutor, endereco_id: Number(fields.endereco_id) }
+    if (lookingUp) throw new Error('Aguarde a consulta de CEP terminar.')
+    const cep = digits(address.cep)
+    if (cep.length !== 8) throw new Error('Informe um CEP de 8 dígitos.')
+    const endereco = { cep, uf: address.uf }
+    for (const [name, label, , required] of addressFields) {
+      const value = (address[name] ?? '').trim()
+      if (required && !value) throw new Error(`Preencha o campo ${label} do endereço.`)
+      endereco[name] = value || null
+    }
+    return { ...tutor, endereco }
+  }
+
+  async function saveTutor(input) {
+    if (isDemo || !input.endereco) return onSave(input)
+
+    const { endereco, ...tutor } = input
+    if (!record && data.tutors.some((item) => digits(item.cpf) === tutor.cpf)) {
+      throw new Error('Já existe um tutor com este CPF.')
+    }
+
+    const addressKey = JSON.stringify(endereco)
+    if (savedAddress.current?.key !== addressKey) {
+      const saved = await repository.createAddress(endereco)
+      savedAddress.current = { key: addressKey, id: saved.id }
+    }
+
+    try {
+      return await onSave({ ...tutor, endereco_id: savedAddress.current.id })
+    } catch (error) {
+      throw new Error(`O endereço foi salvo. O cadastro do tutor falhou: ${error.message}`)
     }
   }
 
-  return <Editor title={record ? 'Editar tutor' : 'Novo tutor'} onClose={onClose} onSave={onSave} read={read}>
+  return <Editor title={record ? 'Editar tutor' : 'Novo tutor'} onClose={onClose} onSave={saveTutor} read={read}>
     <Field name="nome_completo" label="Nome completo" required minLength={3} maxLength={150} defaultValue={record?.nome_completo} />
     <Field name="cpf" label="CPF" inputMode="numeric" maxLength={14} required={!record} readOnly={Boolean(record)} defaultValue={record?.cpf} />
     <Field name="data_nascimento" label="Nascimento" type="date" max={localDate()} required defaultValue={record?.data_nascimento} />
     <Field name="email" label="E-mail" type="email" required defaultValue={record?.email} />
     <Field name="telefone" label="Telefone" type="tel" required maxLength={20} defaultValue={record?.telefone} />
     <h3 className="field--wide section-label">Endereço</h3>
-    {isDemo ? <>
+    {!isDemo && addresses.length > 0 && <Select label="Tipo de endereço" value={addressMode} items={[
+      ['new', 'Cadastrar novo endereço'], ['existing', 'Usar endereço já cadastrado'],
+    ]} onChange={(event) => setAddressMode(event.target.value)} />}
+    {addressMode === 'existing' ? <Select label="Endereço existente" name="endereco_id" required defaultValue={record?.endereco_id ?? ''} items={addresses.map((item) => [item.id, `${item.logradouro}, ${item.numero} · ${item.cidade}/${item.uf}`])} /> : <>
       <div className="field--wide address-lookup">
-        <Field label="CEP" name="cep" inputMode="numeric" maxLength={9} required value={address.cep ?? ''} onChange={(event) => { setAddressField('cep', event.target.value); setCepMessage('') }} />
+        <Field label="CEP" name="cep" inputMode="numeric" maxLength={9} required readOnly={lookingUp} value={address.cep ?? ''} onChange={(event) => {
+          const cep = event.target.value
+          if (cepFound && digits(cep) !== digits(address.cep)) {
+            setAddress({ cep, numero: address.numero })
+            setCepFound(false)
+            setCepMessage('')
+          } else {
+            setAddressField('cep', cep)
+            if (!cepFound) setCepMessage('')
+          }
+        }} />
         <Button variant="secondary" disabled={lookingUp} onClick={lookup}>{lookingUp ? 'Consultando…' : 'Consultar CEP'}</Button>
       </div>
-      {cepMessage && <p className="field--wide muted" role="status">{cepMessage}</p>}
-      {[
-        ['logradouro', 'Logradouro', true], ['numero', 'Número', true], ['complemento', 'Complemento', false],
-        ['bairro', 'Bairro', true], ['cidade', 'Cidade', true], ['ibge', 'Código IBGE', false],
-      ].map(([name, label, required]) => <Field key={name} label={label} name={name} required={required} value={address[name] ?? ''} onChange={(event) => setAddressField(name, event.target.value)} />)}
-      <Select label="UF" name="uf" required items={ufOptions.map((uf) => [uf, uf])} value={address.uf ?? ''} onChange={(event) => setAddressField('uf', event.target.value)} />
-    </> : <>
-      <p className="field--wide muted">A API atual aceita apenas endereços já cadastrados. A consulta de CEP ainda está em desenvolvimento.</p>
-      <Select label="Endereço existente" name="endereco_id" required defaultValue={record?.endereco_id ?? ''} items={addresses.map((item) => [item.id, `${item.logradouro}, ${item.numero} · ${item.cidade}/${item.uf}`])} />
+      {cepMessage && <p className={`field--wide ${cepFound ? 'muted' : 'notice notice--error'}`} role="status">{cepMessage}</p>}
+      {addressFields.map(([name, label, maxLength, required]) => <Field key={name} label={label} name={name} maxLength={maxLength} required={required} readOnly={lookingUp} value={address[name] ?? ''} onChange={(event) => setAddressField(name, event.target.value)} />)}
+      <Select label="UF" name="uf" required disabled={lookingUp} items={ufOptions.map((uf) => [uf, uf])} value={address.uf ?? ''} onChange={(event) => setAddressField('uf', event.target.value)} />
     </>}
   </Editor>
 }
@@ -130,6 +178,16 @@ function TutorEditor({ record, data, onClose, onSave }) {
 function AnimalEditor({ record, data, onClose, onSave }) {
   const [species, setSpecies] = useState(String(record?.especie?.id ?? ''))
   const [breed, setBreed] = useState(String(record?.raca?.id ?? ''))
+  const speciesOptions = options(data.species, 'nome')
+  const breedOptions = options(data.breeds.filter((item) => item.especie_id === Number(species)), 'nome')
+
+  // Existing records may reference entries that are no longer listed as active.
+  if (record?.especie && !speciesOptions.some(([id]) => id === record.especie.id)) {
+    speciesOptions.push([record.especie.id, `${record.especie.nome} (cadastro atual)`])
+  }
+  if (record?.raca && record.especie?.id === Number(species) && !breedOptions.some(([id]) => id === record.raca.id)) {
+    breedOptions.push([record.raca.id, `${record.raca.nome} (cadastro atual)`])
+  }
 
   function read(fields) {
     if (!fields.nome.trim()) throw new Error('Informe o nome do animal.')
@@ -145,8 +203,8 @@ function AnimalEditor({ record, data, onClose, onSave }) {
   return <Editor title={record ? 'Editar ficha' : 'Novo animal'} onClose={onClose} onSave={onSave} read={read}>
     <Field label="Nome do animal" name="nome" required maxLength={100} defaultValue={record?.nome} />
     <Select label="Tutor" name="tutor_id" required defaultValue={record?.tutor?.id ?? ''} items={options(active(data.tutors), 'nome_completo')} />
-    <Select label="Espécie" name="especie_id" required value={species} items={options(data.species, 'nome')} onChange={(event) => { setSpecies(event.target.value); setBreed('') }} />
-    <Select label="Raça" name="raca_id" optional placeholder="Sem raça definida" value={breed} items={options(data.breeds.filter((item) => item.especie_id === Number(species)), 'nome')} onChange={(event) => setBreed(event.target.value)} />
+    <Select label="Espécie" name="especie_id" required value={species} items={speciesOptions} onChange={(event) => { setSpecies(event.target.value); setBreed('') }} />
+    <Select label="Raça" name="raca_id" optional placeholder="Sem raça definida" value={breed} items={breedOptions} disabled={!species} onChange={(event) => setBreed(event.target.value)} />
     <Select label="Sexo" name="sexo" required defaultValue={record?.sexo ?? ''} items={ [['F', 'Fêmea'], ['M', 'Macho']] } />
     <Field label="Pelagem / cor" name="cor" maxLength={50} defaultValue={record?.cor ?? ''} />
     <Field label="Nascimento" name="data_nascimento" type="date" max={localDate()} defaultValue={record?.data_nascimento ?? ''} />
@@ -165,7 +223,7 @@ function ClinicalFields({ data, animalId, record, fixedAnimal = false }) {
   </>
 }
 
-function AppointmentEditor({ record, animalId, day, data, onClose, onSave }) {
+function AppointmentEditor({ record, animalId, day, completeAppointment, data, onClose, onSave }) {
   function read(fields) {
     if (fields.motivo.trim().length < 3) throw new Error('Informe o motivo do atendimento.')
     return {
@@ -175,11 +233,14 @@ function AppointmentEditor({ record, animalId, day, data, onClose, onSave }) {
     }
   }
   const dateTime = record?.data_hora ? `${appointmentDay(record.data_hora)}T${formatTime(record.data_hora)}` : (day ? `${day}T09:00` : undefined)
+  const title = completeAppointment ? 'Registrar atendimento' : record ? 'Editar consulta' : 'Nova consulta'
+  const statuses = [['agendada', 'Agendada'], ['realizada', 'Realizada'], ['nao_compareceu', 'Não compareceu']]
+  if (record?.situacao === 'cancelada') statuses.push(['cancelada', 'Cancelada'])
 
-  return <Editor title={record ? 'Editar consulta' : 'Nova consulta'} onClose={onClose} onSave={onSave} read={read}>
+  return <Editor title={title} onClose={onClose} onSave={onSave} read={read}>
     <ClinicalFields data={data} record={record} animalId={animalId} />
     <Field label="Data e hora" name="data_hora" type="datetime-local" required defaultValue={dateTime} />
-    <Select label="Situação" name="situacao" required defaultValue={record?.situacao ?? 'agendada'} items={ [['agendada', 'Agendada'], ['realizada', 'Realizada'], ['cancelada', 'Cancelada'], ['nao_compareceu', 'Não compareceu']] } />
+    <Select label="Situação" name="situacao" required defaultValue={completeAppointment ? 'realizada' : record?.situacao ?? 'agendada'} items={statuses} />
     <Field label="Motivo" name="motivo" required minLength={3} maxLength={200} defaultValue={record?.motivo} />
     <Field label="Peso (kg)" name="peso" type="number" min="0.01" max="9999.99" step="0.01" defaultValue={record?.peso ?? ''} />
     <Field label="Temperatura (°C)" name="temperatura" type="number" min="30" max="45" step="0.1" defaultValue={record?.temperatura ?? ''} />
@@ -190,10 +251,15 @@ function AppointmentEditor({ record, animalId, day, data, onClose, onSave }) {
   </Editor>
 }
 
-function VaccineEditor({ record, animalId, data, onClose, onSave }) {
-  const [status, setStatus] = useState(record?.situacao ?? 'aplicada')
+function VaccineEditor({ record, animalId, applyVaccine, data, onClose, onSave }) {
+  const [status, setStatus] = useState(applyVaccine ? 'aplicada' : record?.situacao ?? 'aplicada')
   const [rabies, setRabies] = useState(record?.antirrabica ? '1' : '0')
   const alreadyApplied = record?.situacao === 'aplicada'
+  const nextDose = record?.data_proxima_dose
+  const initialNextDose = applyVaccine && nextDose <= localDate() ? '' : nextDose ?? ''
+  const title = applyVaccine ? 'Registrar aplicação' : record ? 'Editar vacina' : 'Registrar vacina'
+  const statuses = alreadyApplied || applyVaccine ? [['aplicada', 'Aplicada']] : [['aplicada', 'Aplicada'], ['agendada', 'Agendada']]
+  if (record?.situacao === 'cancelada') statuses.push(['cancelada', 'Cancelada'])
 
   function read(fields) {
     const applicationDate = status === 'aplicada' ? fields.data_aplicacao : null
@@ -212,8 +278,8 @@ function VaccineEditor({ record, animalId, data, onClose, onSave }) {
     }
   }
 
-  return <Editor title={record ? 'Editar vacina' : 'Registrar vacina'} onClose={onClose} onSave={onSave} read={read}>
-    <ClinicalFields data={data} record={record} animalId={animalId} fixedAnimal={alreadyApplied} />
+  return <Editor title={title} onClose={onClose} onSave={onSave} read={read}>
+    <ClinicalFields data={data} record={record} animalId={animalId} fixedAnimal={alreadyApplied || applyVaccine} />
     <Field label="Nome da vacina" name="nome_vacina" required minLength={2} maxLength={100} defaultValue={record?.nome_vacina} />
     {alreadyApplied ? <Field label="Classificação" readOnly value={rabies === '1' ? 'Antirrábica' : 'Não antirrábica'} /> :
       <Select label="Classificação" name="classificacao" required value={rabies} items={ [['0', 'Não antirrábica'], ['1', 'Antirrábica']] } onChange={(event) => setRabies(event.target.value)} />}
@@ -223,9 +289,9 @@ function VaccineEditor({ record, animalId, data, onClose, onSave }) {
     <Field label="Validade do lote" name="validade_lote" type="date" required defaultValue={record?.validade_lote} />
     <Field label="Dose" name="dose" required maxLength={30} defaultValue={record?.dose} />
     <Field label="Via de aplicação" name="via_aplicacao" maxLength={30} defaultValue={record?.via_aplicacao ?? ''} />
-    <Select label="Situação" name="situacao" required value={status} items={alreadyApplied ? [['aplicada', 'Aplicada']] : [['aplicada', 'Aplicada'], ['agendada', 'Agendada'], ['cancelada', 'Cancelada']]} onChange={(event) => setStatus(event.target.value)} />
+    <Select label="Situação" name="situacao" required value={status} items={statuses} onChange={(event) => setStatus(event.target.value)} />
     {status === 'aplicada' && <Field label="Data da aplicação" name="data_aplicacao" type="date" required max={localDate()} defaultValue={record?.data_aplicacao ?? localDate()} />}
-    <Field label="Próxima dose" name="data_proxima_dose" type="date" defaultValue={record?.data_proxima_dose ?? ''} />
+    <Field label="Próxima dose" name="data_proxima_dose" type="date" defaultValue={initialNextDose} />
     <Notes label="Observações" name="observacoes" defaultValue={record?.observacoes ?? ''} />
   </Editor>
 }
@@ -245,5 +311,5 @@ const editors = { tutor: TutorEditor, animal: AnimalEditor, consulta: Appointmen
 
 export function ClinicEditor({ editor, data, onClose, onSave }) {
   const Form = editors[editor.kind]
-  return <Form record={editor.record} animalId={editor.animalId} day={editor.day} data={data} onClose={onClose} onSave={onSave} />
+  return <Form record={editor.record} animalId={editor.animalId} day={editor.day} completeAppointment={editor.completeAppointment} applyVaccine={editor.applyVaccine} data={data} onClose={onClose} onSave={onSave} />
 }

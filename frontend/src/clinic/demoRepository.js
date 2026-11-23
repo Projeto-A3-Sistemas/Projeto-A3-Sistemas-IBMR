@@ -101,6 +101,14 @@ export const demoRepository = {
     return commit(data, record)
   },
 
+  async cancelAppointment(id) {
+    const data = read()
+    const record = byId(data.appointments, id)
+    if (!record) throw new Error('Consulta não encontrada.')
+    record.situacao = 'cancelada'
+    return commit(data, record)
+  },
+
   async saveVaccine(input, id) {
     const data = read()
     const { animal_id, veterinario_id, ...fields } = input
@@ -113,6 +121,15 @@ export const demoRepository = {
     const record = { ...fields, id: id ?? nextId(data.vaccines), animal: ref(animal), veterinario: personRef(veterinarian) }
     put(data.vaccines, record)
     if (record.antirrabica && record.situacao === 'aplicada') enqueue(data, animal, 'Vacina antirrábica', record.id)
+    return commit(data, record)
+  },
+
+  async cancelVaccine(id) {
+    const data = read()
+    const record = byId(data.vaccines, id)
+    if (!record) throw new Error('Vacina não encontrada.')
+    if (record.situacao === 'aplicada') throw new Error('Uma vacina já aplicada não pode ser cancelada.')
+    record.situacao = 'cancelada'
     return commit(data, record)
   },
 

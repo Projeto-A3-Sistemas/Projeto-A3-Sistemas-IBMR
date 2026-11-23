@@ -205,6 +205,7 @@ select { appearance: none; padding-right: 34px; background-image: url("data:imag
 .notice--success { color: #215732; background: #f4faf2; }
 .vaccine-notice { justify-content: space-between; }
 .vaccine-notice > div { display: flex; align-items: center; flex-wrap: wrap; gap: 8px 12px; }
+.vaccine-actions { justify-content: flex-end; }
 
 .modal {
   width: min(650px, calc(100% - 24px));
@@ -293,6 +294,7 @@ select { appearance: none; padding-right: 34px; background-image: url("data:imag
   .data-table td:not(:first-child):not(:last-child)::before, .data-table td:last-child:not([data-label=""])::before { content: attr(data-label); color: var(--muted); font-size: .875rem; }
   .data-table td:last-child[data-label=""] { display: block; text-align: left; }
   .data-table td:last-child .button { width: 100%; }
+  .vaccine-actions { justify-content: flex-start; }
   .patient > .button { margin-left: 0; }
   .patient-description { flex-basis: 150px; min-width: 0; }
   .patient .key-values { gap: 6px 12px; }
