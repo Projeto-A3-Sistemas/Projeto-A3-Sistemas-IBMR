@@ -48,8 +48,14 @@ app.include_router(veterinarios.router)
 app.include_router(consultas.router)
 app.include_router(vacinas.router)
 
-# Descomente quando as outras partes estiverem prontas:
-# from app.routers import auth, especies, racas
+# P4 - especies, racas, enderecos e CEP
+from app.routers import cep, enderecos, especies, racas  # noqa: E402
+
+app.include_router(especies.router)
+app.include_router(racas.router)
+app.include_router(enderecos.router)
+app.include_router(cep.router)
+
+# Descomente quando o login estiver pronto:
+# from app.routers import auth
 # app.include_router(auth.router)
-# app.include_router(especies.router)
-# app.include_router(racas.router)
