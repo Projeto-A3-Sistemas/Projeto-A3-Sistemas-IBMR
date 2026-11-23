@@ -10,11 +10,13 @@ from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import text
 
 from app.db.session import engine
+from app.services.reenvio import ciclo_de_vida
 
 app = FastAPI(
     title="SDM - API da Clinica",
     description="API privada do Sistema de Gestao de Clinica Veterinaria.",
     version="0.1.0",
+    lifespan=ciclo_de_vida,
 )
 
 # Libera o frontend (React/Vite) a chamar a API
@@ -47,6 +49,12 @@ app.include_router(animais.router)
 app.include_router(veterinarios.router)
 app.include_router(consultas.router)
 app.include_router(vacinas.router)
+
+# P3 - microchip e integração com o governo (Milestone 4)
+from app.routers import integracoes, microchips  # noqa: E402
+
+app.include_router(microchips.router)
+app.include_router(integracoes.router)
 
 # P4 - especies, racas, enderecos e CEP
 from app.routers import cep, enderecos, especies, racas  # noqa: E402
