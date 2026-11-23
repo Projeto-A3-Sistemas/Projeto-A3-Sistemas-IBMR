@@ -1,5 +1,5 @@
 """CRUD de animais (P3)."""
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, status
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
@@ -8,6 +8,7 @@ from app.db.session import get_db
 from app.models import Animal, Especie, Raca, Tutor
 from app.schemas.animal import AnimalAtualizar, AnimalCriar, AnimalResposta
 from app.services.erros import tratar_erro_banco
+from app.services.integracao import enviar_em_segundo_plano, registrar_atualizacao_animal
 
 router = APIRouter(prefix="/api/animais", tags=["Animais"])
 
@@ -74,17 +75,23 @@ def consultar(animal_id: int, db: Session = Depends(get_db)):
 
 
 @router.put("/{animal_id}", response_model=AnimalResposta)
-def atualizar(animal_id: int, dados: AnimalAtualizar, db: Session = Depends(get_db)):
+def atualizar(animal_id: int, dados: AnimalAtualizar, tarefas: BackgroundTasks, db: Session = Depends(get_db)):
+    """Atualiza o animal. Se ele tem microchip, a mudança também é enviada ao governo."""
     animal = _buscar(db, animal_id)
     _conferir_vinculos(db, dados)
     for campo, valor in dados.model_dump().items():
         setattr(animal, campo, valor)
+    integracao = None
     try:
+        db.flush()
+        db.refresh(animal)
+        integracao = registrar_atualizacao_animal(db, animal)
         db.commit()
     except IntegrityError as erro:
         db.rollback()
         raise tratar_erro_banco(erro)
     db.refresh(animal)
+    enviar_em_segundo_plano(tarefas, integracao.id if integracao else None)
     return animal
 
 
