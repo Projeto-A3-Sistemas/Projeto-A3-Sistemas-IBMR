@@ -174,7 +174,7 @@ function ClinicWorkspace({ logout }) {
   }
   async function save(input) {
     const { kind, record } = editor
-    if (kind === 'microchip') await repository.linkChip(record.id, input)
+    if (kind === 'microchip') await repository.linkChip(record.id, input, editor.replaceChip)
     else await repository[saveMethods[kind]](input, record?.id)
     await load()
     const messages = { microchip: 'Vínculo de microchip registrado.', consulta: 'Consulta salva.', vacina: 'Vacina salva.' }
@@ -186,17 +186,19 @@ function ClinicWorkspace({ logout }) {
     setMessage(confirmation.success)
   }
   async function retry(id) {
-    await repository.retryIntegration(id)
+    const result = await repository.retryIntegration(id)
     await load()
-    setMessage('Reenvio simulado confirmado.')
+    if (result.situacao === 'confirmada') {
+      setMessage(isDemo ? 'Reenvio simulado confirmado.' : 'Comunicação confirmada pelo governo simulado.')
+    }
   }
 
   const pages = {
     tutores: <TutorsPage data={data} edit={edit} deactivate={deactivate} />,
-    animais: route.id ? <AnimalPage data={data} edit={edit} deactivate={deactivate} cancelAppointment={cancelAppointment} cancelVaccine={cancelVaccine} navigate={navigate} id={route.id} tab={route.tab} /> : <AnimalsPage data={data} edit={edit} />,
+    animais: route.id ? <AnimalPage key={route.id} data={data} edit={edit} deactivate={deactivate} cancelAppointment={cancelAppointment} cancelVaccine={cancelVaccine} navigate={navigate} id={route.id} tab={route.tab} /> : <AnimalsPage data={data} edit={edit} />,
     consultas: <ConsultationsPage data={data} edit={edit} cancelAppointment={cancelAppointment} />,
     vacinas: <VaccinesPage data={data} edit={edit} cancelVaccine={cancelVaccine} />,
-    integracoes: <IntegrationsPage data={data} selectedId={route.id} navigate={navigate} retry={retry} />,
+    integracoes: <IntegrationsPage data={data} selectedId={route.id} navigate={navigate} retry={retry} refresh={load} />,
   }
 
   return <div className="app-shell">

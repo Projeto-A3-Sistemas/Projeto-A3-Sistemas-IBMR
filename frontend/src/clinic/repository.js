@@ -11,21 +11,22 @@ const endpoints = {
   vaccines: ['/api/vacinas', 'vacinas'],
   species: ['/api/especies', 'espécies'],
   breeds: ['/api/racas', 'raças'],
+  integrations: ['/api/integracoes', 'comunicações governamentais'],
 }
 
 export const emptyData = {
   tutors: [], animals: [], appointments: [], vaccines: [], vets: [], integrations: [],
-  species: [], breeds: [], errors: [],
+  species: [], breeds: [], errors: [], integrationsAvailable: false,
 }
 
-async function request(path, { method = 'GET', body } = {}) {
+async function request(path, { method = 'GET', body, timeout = 8000 } = {}) {
   let response
   try {
     response = await fetch(`${apiBase}${path}`, {
       method,
       headers: { Accept: 'application/json', ...(body ? { 'Content-Type': 'application/json' } : {}) },
       body: body ? JSON.stringify(body) : undefined,
-      signal: AbortSignal.timeout(8000),
+      signal: AbortSignal.timeout(timeout),
     })
   } catch (error) {
     if (error.name === 'TimeoutError') throw new Error('A API da clínica demorou para responder.')
@@ -33,13 +34,29 @@ async function request(path, { method = 'GET', body } = {}) {
   }
   const data = await response.json().catch(() => null)
   if (!response.ok) {
-    if (typeof data?.detail === 'string') throw new Error(data.detail)
+    let message = `A API respondeu com HTTP ${response.status}.`
+    if (typeof data?.detail === 'string') message = data.detail
     if (Array.isArray(data?.detail)) {
-      throw new Error(data.detail.map(({ loc, msg }) => `${loc?.slice(1).join('.') || 'Dados'}: ${msg}`).join(' · '))
+      message = data.detail.map(({ loc, msg }) => `${loc?.slice(1).join('.') || 'Dados'}: ${msg}`).join(' · ')
     }
-    throw new Error(`A API respondeu com HTTP ${response.status}.`)
+    throw Object.assign(new Error(message), { status: response.status })
   }
   return data
+}
+
+const operationNames = {
+  cadastro_animal: 'Cadastro de animal',
+  atualizacao_animal: 'Atualização de animal',
+  vacina_antirrabica: 'Vacina antirrábica',
+}
+
+function integrationRecord(item) {
+  return {
+    id: item.id, animal: item.animal, vacina_id: item.vacina_id,
+    tipo: operationNames[item.tipo_operacao] ?? item.tipo_operacao,
+    situacao: item.situacao, tentativas: item.tentativas, protocolo: item.protocolo_externo,
+    data: item.data_solicitacao, resposta: item.data_resposta, erro: item.mensagem_erro,
+  }
 }
 
 function save(resource, body, id) {
@@ -68,8 +85,16 @@ const apiRepository = {
     const data = { ...emptyData, errors: [] }
     results.forEach((result, index) => {
       const [key, [, label]] = resources[index]
-      if (result.status === 'fulfilled' && Array.isArray(result.value)) data[key] = result.value
-      else data.errors.push(`Não foi possível carregar ${label}. ${result.reason?.message ?? 'Resposta inesperada.'}`)
+      if (key === 'integrations') {
+        // Releases before PR #3 do not expose this router.
+        if (result.reason?.status === 404) return
+        data.integrationsAvailable = true
+      }
+      if (result.status === 'fulfilled' && Array.isArray(result.value)) {
+        data[key] = key === 'integrations' ? result.value.map(integrationRecord) : result.value
+      } else {
+        data.errors.push(`Não foi possível carregar ${label}. ${result.reason?.message ?? 'Resposta inesperada.'}`)
+      }
     })
     return data
   },
@@ -87,6 +112,19 @@ const apiRepository = {
   saveVaccine: (body, id) => save('vaccines', body, id),
   listAnimalVaccines: (id) => listAnimalRecords('vaccines', id),
   cancelVaccine: (id) => request(`/api/vacinas/${id}`, { method: 'DELETE' }),
+  async listMicrochips(animalId) {
+    const records = await request(`/api/animais/${animalId}/microchip/historico`)
+    if (!Array.isArray(records)) throw new Error('A API retornou um histórico de microchip inválido.')
+    return records.map((record) => ({
+      codigo: record.codigo_microchip, data_implantacao: record.data_implantacao,
+      data_vinculo: record.data_vinculo, veterinario: record.veterinario?.nome_completo,
+      atual: record.situacao === 'ativo',
+    }))
+  },
+  linkChip: (id, input, replace) => request(`/api/animais/${id}/microchip${replace ? '/substituir' : ''}`, { method: 'POST', body: input }),
+  async retryIntegration(id) {
+    return integrationRecord(await request(`/api/integracoes/${id}/reenviar`, { method: 'POST', timeout: 20000 }))
+  },
   deactivate: (name, id) => request(`${endpoints[name][0]}/${id}`, { method: 'DELETE' }),
 }
 

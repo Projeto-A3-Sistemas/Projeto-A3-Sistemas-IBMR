@@ -1,4 +1,4 @@
-import { demoAddresses, demoVeterinarian, seed } from './demoData.js'
+import { demoAddresses, seed } from './demoData.js'
 import { digits, localDate } from './format.js'
 
 const storageKey = 'clinica-veterinaria:demo:v1'
@@ -140,16 +140,18 @@ export const demoRepository = {
     return commit(data, record)
   },
 
-  async linkChip(id, codigo) {
+  async linkChip(id, { codigo_microchip: codigo, veterinario_id, data_implantacao }) {
     const data = read()
     const animal = byId(data.animals, id)
     if (animal?.situacao !== 'ativo') throw new Error('Selecione um animal ativo.')
+    const veterinarian = byId(data.vets, veterinario_id)
+    if (veterinarian?.situacao !== 'ativo') throw new Error('Selecione um veterinário ativo.')
     if (data.animals.some((item) => item.chips.some((chip) => chip.codigo === codigo))) {
       throw new Error('Este código de microchip já está registrado.')
     }
     const type = animal.chips.length ? 'Atualização de animal' : 'Cadastro de animal'
     for (const chip of animal.chips) chip.atual = false
-    animal.chips.unshift({ codigo, data_vinculo: localDate(), veterinario: demoVeterinarian.nome_completo, atual: true })
+    animal.chips.unshift({ codigo, data_implantacao, data_vinculo: localDate(), veterinario: veterinarian.nome_completo, atual: true })
     enqueue(data, animal, type)
     return commit(data, animal)
   },

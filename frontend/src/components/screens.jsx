@@ -5,7 +5,6 @@ import { isDemo, repository } from '../clinic/repository.js'
 import { Button, DataTable, DateText, Icon, KeyValues, PageHeader, PetAvatar, Search, Status, Tabs } from './ui.jsx'
 
 const find = (records, id) => records.find((record) => record.id === Number(id))
-const chipOf = (animal) => animal.chips?.find((chip) => chip.atual)
 const activeStatus = (animal) => animal.situacao === 'ativo' ? (animal.sexo === 'F' ? 'Ativa' : 'Ativo') : (animal.sexo === 'F' ? 'Inativa' : 'Inativo')
 const animalDescription = (animal) => [animal.especie?.nome, animal.raca?.nome ?? 'Sem raça definida'].filter(Boolean).join(' · ')
 const animalPath = (id, tab) => `#/animais/${id}${tab ? `?aba=${tab}` : ''}`
@@ -69,7 +68,8 @@ export function AnimalsPage({ data, edit }) {
   const columns = [
     { key: 'name', label: 'Animal', render: (animal) => <div className="animal-cell"><PetAvatar animal={animal} /><div><strong>{animal.nome}</strong><small>{animalDescription(animal)}</small></div></div> },
     { key: 'tutor', label: 'Tutor', render: (animal) => animal.tutor?.nome_completo ?? '—' },
-    { key: 'chip', label: 'Microchip RFID', render: (animal) => isDemo ? formatChip(chipOf(animal)?.codigo) : 'Indisponível' },
+    { key: 'chip', label: 'Microchip RFID', render: (animal) => isDemo ? formatChip(animal.chips?.find((chip) => chip.atual)?.codigo) :
+      data.integrationsAvailable ? <a className="text-link" href={animalPath(animal.id, 'microchip')}>Ver vínculo</a> : 'Indisponível' },
     { key: 'status', label: 'Situação', render: (animal) => <Status value={animal.situacao} label={activeStatus(animal)} /> },
     { key: 'action', label: '', render: (animal) => <a className="button button--secondary" href={animalPath(animal.id)} aria-label={`Abrir ficha de ${animal.nome}`}>Abrir ficha</a> },
   ]
@@ -182,7 +182,7 @@ export function VaccinesPage({ data, edit, cancelVaccine }) {
   </>
 }
 
-export function IntegrationsPage({ data, selectedId, navigate, retry }) {
+export function IntegrationsPage({ data, selectedId, navigate, retry, refresh }) {
   const [status, setStatus] = useState('')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
@@ -190,6 +190,7 @@ export function IntegrationsPage({ data, selectedId, navigate, retry }) {
   const selected = find(records, selectedId) ?? records[0]
   const vaccine = selected ? find(data.vaccines, selected.vacina_id) : null
   async function confirmRetry() {
+    if (busy) return
     setBusy(true)
     setError('')
     try {
@@ -197,17 +198,20 @@ export function IntegrationsPage({ data, selectedId, navigate, retry }) {
       setStatus('')
     } catch (failure) {
       setError(failure.message)
+      if (failure.status === 409) await refresh()
     } finally {
       setBusy(false)
     }
   }
   return <>
-    <PageHeader title="Integrações" description="API governamental simulada" />
-    {!isDemo ? <section className="panel work-panel"><h2>Comunicações</h2><p className="muted">A API da clínica ainda não expõe a consulta de status, protocolos ou reenvio.</p></section> :
+    <PageHeader title="Integrações" description="API governamental simulada">
+      {!isDemo && data.integrationsAvailable && <Button variant="secondary" disabled={busy} onClick={() => { setError(''); refresh() }}>Atualizar comunicações</Button>}
+    </PageHeader>
+    {!isDemo && !data.integrationsAvailable ? <section className="panel work-panel"><h2>Comunicações</h2><p className="muted">A versão da API em execução ainda não expõe as rotas de integração.</p></section> :
       <div className="split split--integrations">
         <section className="panel work-panel">
           <h2>Comunicações</h2>
-          <Tabs label="Filtrar comunicações" value={status} onChange={(value) => { setStatus(value); setError('') }} items={ [['', 'Todas'], ['pendente', 'Pendentes'], ['confirmada', 'Confirmadas']] } />
+          <Tabs label="Filtrar comunicações" value={status} onChange={(value) => { setStatus(value); setError('') }} items={ [['', 'Todas'], ['pendente', 'Pendentes'], ['enviada', 'Enviadas'], ['confirmada', 'Confirmadas'], ['falha', 'Com falha']] } />
           {records.length ? <div className="queue integration-queue">
             {records.map((record) => <button className="queue-row" key={record.id} type="button" aria-pressed={record.id === selected?.id} onClick={() => { navigate(integrationPath(record.id)); setError('') }}>
               <span><strong>{record.animal.nome}</strong><small>{record.tipo}</small></span><span><Status value={record.situacao} /><small>{formatDate(record.data)}</small></span>
@@ -216,42 +220,47 @@ export function IntegrationsPage({ data, selectedId, navigate, retry }) {
         </section>
         <section className="panel work-panel integration-details" aria-label="Detalhes da comunicação">
           {selected ? <>
-            <div className="section-header"><h2>{vaccine ? `Vacinação de ${selected.animal.nome}` : `${selected.tipo} · ${selected.animal.nome}`}</h2><Status value={selected.situacao} /></div>
+            <div className="section-header"><h2>{selected.vacina_id ? `Vacinação de ${selected.animal.nome}` : `${selected.tipo} · ${selected.animal.nome}`}</h2><Status value={selected.situacao} /></div>
             <KeyValues items={[
               ['Registro na clínica', vaccine ? `Aplicada em ${formatDate(vaccine.data_aplicacao)}` : `Registrado em ${formatDate(selected.data)}`],
-              ['Protocolo', selected.protocolo ?? 'Aguardando confirmação'],
+              ['Protocolo', selected.protocolo ?? (selected.situacao === 'pendente' || selected.situacao === 'enviada' ? 'Aguardando confirmação' : 'Sem protocolo')],
               ['Tentativas', selected.tentativas],
+              ...(selected.resposta ? [['Última resposta', formatDate(selected.resposta)]] : []),
             ]} />
             {selected.erro && <p className="notice notice--warning"><Icon name="clock" />{selected.erro}</p>}
             {error && <p className="notice notice--error" role="alert">{error}</p>}
-            {selected.situacao !== 'confirmada' && <Button onClick={confirmRetry} disabled={busy}>{busy ? 'Reenviando…' : 'Reenviar comunicação'}</Button>}
-            <a className="text-link" href={animalPath(selected.animal.id, vaccine ? 'vacinas' : 'microchip')}>Abrir ficha do animal</a>
+            {['pendente', 'falha'].includes(selected.situacao) && <Button onClick={confirmRetry} disabled={busy}>{busy ? 'Reenviando…' : 'Reenviar comunicação'}</Button>}
+            <a className="text-link" href={animalPath(selected.animal.id, selected.vacina_id ? 'vacinas' : 'microchip')}>Abrir ficha do animal</a>
           </> : <p className="empty">Selecione uma comunicação para ver os detalhes.</p>}
         </section>
       </div>}
   </>
 }
 
-function ChipHistory({ animal, edit }) {
+function ChipHistory({ animal, edit, history, available, vets }) {
+  const chip = history.items.find((item) => item.atual)
   const columns = [
     { key: 'codigo', label: 'Microchip RFID', render: (row) => <strong>{formatChip(row.codigo)}</strong> },
+    { key: 'implantacao', label: 'Implantação', render: (row) => <DateText value={row.data_implantacao} /> },
     { key: 'date', label: 'Vínculo', render: (row) => <DateText value={row.data_vinculo} /> },
     { key: 'vet', label: 'Veterinário', render: (row) => row.veterinario },
     { key: 'status', label: 'Situação', render: (row) => <Status value={row.atual ? 'ativo' : 'inativo'} label={row.atual ? 'Atual' : 'Substituído'} /> },
   ]
   return <section className="panel work-panel">
-    <div className="section-header"><h2>Histórico de microchip</h2>{isDemo && <Button icon="chip" disabled={animal.situacao !== 'ativo'} onClick={() => edit('microchip', animal)}>{chipOf(animal) ? 'Substituir microchip' : 'Vincular microchip'}</Button>}</div>
-    {isDemo ? <DataTable rows={animal.chips ?? []} columns={columns} rowKey="codigo" label="Vínculos de microchip" empty="Nenhum microchip vinculado." /> : <p className="muted">O vínculo de microchip ainda não está disponível na API da clínica.</p>}
+    <div className="section-header"><h2>Histórico de microchip</h2>{available && <Button icon="chip" disabled={animal.situacao !== 'ativo' || !vets.some((vet) => vet.situacao === 'ativo') || history.loading || Boolean(history.error)} onClick={() => edit('microchip', animal, { replaceChip: Boolean(chip) })}>{chip ? 'Substituir microchip' : 'Vincular microchip'}</Button>}</div>
+    {!available ? <p className="muted">A versão da API em execução ainda não expõe o vínculo de microchip.</p> :
+      history.loading || history.error ? <HistoryFeedback history={history} /> :
+      <DataTable rows={history.items} columns={columns} rowKey="codigo" label="Vínculos de microchip" empty="Nenhum microchip vinculado." />}
   </section>
 }
 
-function useAnimalHistory(animalId, records, list) {
+function useAnimalHistory(animalId, records, list, enabled = !isDemo, demoItems = []) {
   const [history, setHistory] = useState(null)
   const [error, setError] = useState('')
   const [reload, setReload] = useState(0)
 
   useEffect(() => {
-    if (isDemo) return
+    if (!enabled || !animalId) return
     let current = true
     setError('')
     list(animalId).then((result) => {
@@ -260,11 +269,11 @@ function useAnimalHistory(animalId, records, list) {
       if (current) setError(error.message)
     })
     return () => { current = false }
-  }, [animalId, records, list, reload])
+  }, [animalId, records, list, reload, enabled])
 
   return {
-    items: isDemo ? records.filter((record) => record.animal.id === animalId) : history ?? [],
-    loading: !isDemo && !history,
+    items: enabled ? history ?? [] : demoItems,
+    loading: enabled && !history,
     error,
     retry: () => setReload((value) => value + 1),
   }
@@ -280,7 +289,8 @@ function HistoryFeedback({ history }) {
 
 function AnimalConsultations({ animal, data, edit, cancelAppointment }) {
   const [selectedId, select] = useState(null)
-  const history = useAnimalHistory(animal.id, data.appointments, repository.listAnimalAppointments)
+  const history = useAnimalHistory(animal.id, data.appointments, repository.listAnimalAppointments, !isDemo,
+    isDemo ? data.appointments.filter((record) => record.animal.id === animal.id) : [])
   const records = [...history.items].sort((a, b) => new Date(b.data_hora) - new Date(a.data_hora))
   const selected = find(records, selectedId) ?? records[0]
   return <div className="split split--agenda">
@@ -294,7 +304,8 @@ function AnimalConsultations({ animal, data, edit, cancelAppointment }) {
 }
 
 function AnimalVaccines({ animal, data, edit, cancelVaccine }) {
-  const history = useAnimalHistory(animal.id, data.vaccines, repository.listAnimalVaccines)
+  const history = useAnimalHistory(animal.id, data.vaccines, repository.listAnimalVaccines, !isDemo,
+    isDemo ? data.vaccines.filter((record) => record.animal.id === animal.id) : [])
   const records = [...history.items]
     .sort((a, b) => (b.data_aplicacao ?? '').localeCompare(a.data_aplicacao ?? ''))
   const communication = data.integrations.find((record) => record.animal.id === animal.id && record.vacina_id && record.situacao === 'pendente')
@@ -312,7 +323,7 @@ function AnimalVaccines({ animal, data, edit, cancelVaccine }) {
         {communication.erro && <p className="muted">{communication.erro}</p>}
         <KeyValues items={ [['Protocolo', communication.protocolo ?? 'Aguardando confirmação']] } />
         <a className="button button--secondary" href={integrationPath(communication.id)}>Ver comunicação</a>
-      </> : <p className="muted">{isDemo ? 'Nenhuma comunicação de vacina registrada.' : 'Consulta de comunicações indisponível na API.'}</p>}
+      </> : <p className="muted">{isDemo || data.integrationsAvailable ? 'Nenhuma comunicação de vacina registrada.' : 'Consulta de comunicações indisponível na API.'}</p>}
     </section>
   </div>
 }
@@ -321,9 +332,11 @@ const animalTabs = [['resumo', 'Resumo'], ['consultas', 'Consultas'], ['vacinas'
 
 export function AnimalPage({ id, tab, data, edit, navigate, deactivate, cancelAppointment, cancelVaccine }) {
   const animal = find(data.animals, id)
+  const chips = useAnimalHistory(animal?.id, data.animals, repository.listMicrochips, !isDemo && data.integrationsAvailable, animal?.chips)
   if (!animal) return <><PageHeader title="Ficha do animal" /><section className="panel work-panel"><p>Animal não encontrado.</p><a className="text-link" href="#/animais">Voltar para animais</a></section></>
   const current = animalTabs.some(([key]) => key === tab) ? tab : 'resumo'
-  const chip = chipOf(animal)
+  const chip = chips.items.find((record) => record.atual)
+  const chipAvailable = isDemo || data.integrationsAvailable
   return <>
     <nav className="breadcrumb" aria-label="Localização"><a href="#/animais">Animais</a><span aria-hidden="true">/</span><span>Ficha do animal</span></nav>
     <section className="panel patient">
@@ -333,7 +346,7 @@ export function AnimalPage({ id, tab, data, edit, navigate, deactivate, cancelAp
         <p className="muted">{animalDescription(animal)}</p>
         <KeyValues items={[
           ['Tutor', animal.tutor?.nome_completo],
-          ['Microchip RFID', isDemo ? formatChip(chip?.codigo) : 'Indisponível'],
+          ['Microchip RFID', !chipAvailable || chips.error ? 'Indisponível' : chips.loading ? 'Consultando…' : formatChip(chip?.codigo)],
         ]} />
       </div>
       <Button variant="secondary" icon="edit" onClick={() => edit('animal', animal)}>Editar ficha</Button>
@@ -351,6 +364,6 @@ export function AnimalPage({ id, tab, data, edit, navigate, deactivate, cancelAp
     </section>}
     {current === 'consultas' && <AnimalConsultations key={animal.id} animal={animal} data={data} edit={edit} cancelAppointment={cancelAppointment} />}
     {current === 'vacinas' && <AnimalVaccines key={animal.id} animal={animal} data={data} edit={edit} cancelVaccine={cancelVaccine} />}
-    {current === 'microchip' && <ChipHistory animal={animal} edit={edit} />}
+    {current === 'microchip' && <ChipHistory animal={animal} edit={edit} history={chips} available={chipAvailable} vets={data.vets} />}
   </>
 }

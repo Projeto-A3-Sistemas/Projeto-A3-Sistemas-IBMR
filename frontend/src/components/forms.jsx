@@ -296,13 +296,17 @@ function VaccineEditor({ record, animalId, applyVaccine, data, onClose, onSave }
   </Editor>
 }
 
-function ChipEditor({ record, onClose, onSave }) {
-  return <Editor title={record.chips?.length ? 'Substituir microchip' : 'Vincular microchip'} onClose={onClose} onSave={onSave} read={({ codigo }) => {
-    const value = digits(codigo)
-    if (value.length !== 15) throw new Error('Informe os 15 dígitos do microchip.')
-    return value
+function ChipEditor({ record, replaceChip, data, onClose, onSave }) {
+  const vets = active(data.vets)
+  return <Editor title={replaceChip ? 'Substituir microchip' : 'Vincular microchip'} onClose={onClose} onSave={onSave} read={(fields) => {
+    const code = fields.codigo_microchip.replace(/ /g, '').trim().toUpperCase()
+    if (!/^[A-Z0-9]{9,30}$/.test(code)) throw new Error('Informe um código de 9 a 30 letras ou números.')
+    if (fields.data_implantacao > localDate()) throw new Error('A data de implantação não pode estar no futuro.')
+    return { codigo_microchip: code, veterinario_id: Number(fields.veterinario_id), data_implantacao: fields.data_implantacao }
   }}>
-    <Field label="Código RFID" name="codigo" required inputMode="numeric" maxLength={19} placeholder="000 000 000 000 000" />
+    <Field label="Código RFID" name="codigo_microchip" required maxLength={40} autoCapitalize="characters" placeholder="000 000 000 000 000" />
+    <Field label="Data de implantação" name="data_implantacao" type="date" required max={localDate()} defaultValue={localDate()} />
+    <Select label="Veterinário" name="veterinario_id" required defaultValue={vets.length === 1 ? vets[0].id : ''} items={options(vets, 'nome_completo')} />
     <p className="field--wide muted">O histórico de vínculos fica disponível na ficha de {record.nome}.</p>
   </Editor>
 }
@@ -311,5 +315,5 @@ const editors = { tutor: TutorEditor, animal: AnimalEditor, consulta: Appointmen
 
 export function ClinicEditor({ editor, data, onClose, onSave }) {
   const Form = editors[editor.kind]
-  return <Form record={editor.record} animalId={editor.animalId} day={editor.day} completeAppointment={editor.completeAppointment} applyVaccine={editor.applyVaccine} data={data} onClose={onClose} onSave={onSave} />
+  return <Form {...editor} data={data} onClose={onClose} onSave={onSave} />
 }

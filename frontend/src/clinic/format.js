@@ -20,7 +20,7 @@ export function formatPhone(value) {
 }
 
 export function formatChip(value) {
-  return value ? String(value).replace(/(\d{3})(?=\d)/g, '$1 ') : 'Não vinculado'
+  return value ? String(value).replace(/^(?:\d+)$/, (code) => code.replace(/(\d{3})(?=\d)/g, '$1 ')) : 'Não vinculado'
 }
 
 export function dayKey(value) {
