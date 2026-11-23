@@ -39,11 +39,23 @@ def health():
     return {"api": "ok", "banco": banco}
 
 
-# ---- Rotas dos modulos (descomente quando cada parte estiver pronta) ----
-# from app.routers import auth, tutores, animais, veterinarios, especies, racas
+# ---- Rotas dos modulos ----
+from app.routers import animais, consultas, tutores, vacinas, veterinarios  # noqa: E402
+
+app.include_router(tutores.router)
+app.include_router(animais.router)
+app.include_router(veterinarios.router)
+app.include_router(consultas.router)
+app.include_router(vacinas.router)
+
+# P4 - especies, racas, enderecos e CEP
+from app.routers import cep, enderecos, especies, racas  # noqa: E402
+
+app.include_router(especies.router)
+app.include_router(racas.router)
+app.include_router(enderecos.router)
+app.include_router(cep.router)
+
+# Descomente quando o login estiver pronto:
+# from app.routers import auth
 # app.include_router(auth.router)
-# app.include_router(tutores.router)
-# app.include_router(animais.router)
-# app.include_router(veterinarios.router)
-# app.include_router(especies.router)
-# app.include_router(racas.router)
