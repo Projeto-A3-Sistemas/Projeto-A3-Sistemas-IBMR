@@ -41,6 +41,18 @@ def health():
     return {"api": "ok", "banco": banco}
 
 
+# ---- Login (P1) ----
+# /health e /api/auth ficam publicos. Toda rota registrada DEPOIS deste bloco
+# exige login de veterinario ativo e com senha confirmada.
+from fastapi import Depends  # noqa: E402
+
+from app.deps import get_current_veterinario  # noqa: E402
+from app.routers import auth  # noqa: E402
+
+app.include_router(auth.router)
+app.router.dependencies.append(Depends(get_current_veterinario))
+
+
 # ---- Rotas dos modulos ----
 from app.routers import animais, consultas, tutores, vacinas, veterinarios  # noqa: E402
 
@@ -63,7 +75,3 @@ app.include_router(especies.router)
 app.include_router(racas.router)
 app.include_router(enderecos.router)
 app.include_router(cep.router)
-
-# Descomente quando o login estiver pronto:
-# from app.routers import auth
-# app.include_router(auth.router)
