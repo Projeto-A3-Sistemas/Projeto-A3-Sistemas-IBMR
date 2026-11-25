@@ -13,8 +13,9 @@ from app.models.animal import Animal
 from app.models.consulta import Consulta
 from app.models.vacina import Vacina
 from app.models.integracao_governo import IntegracaoGoverno
+from app.models.vinculo_microchip import VinculoMicrochip
 
 __all__ = [
     "Base", "Endereco", "Especie", "Raca", "Tutor", "Veterinario", "Animal",
-    "Consulta", "Vacina", "IntegracaoGoverno",
+    "Consulta", "Vacina", "IntegracaoGoverno", "VinculoMicrochip",
 ]

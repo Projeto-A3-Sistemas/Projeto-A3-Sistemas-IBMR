@@ -1,13 +1,14 @@
 from datetime import datetime
 
 from sqlalchemy import DateTime, ForeignKey, Integer, String, Text, func
-from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.session import Base
+from app.models.animal import Animal
 
 
 class IntegracaoGoverno(Base):
-    """Cada linha é uma comunicação a ser enviada à API governamental (Milestone 4)."""
+    """Cada linha é uma comunicação com a API governamental (cadastro, atualização ou vacina)."""
 
     __tablename__ = "integracao_governo"
 
@@ -22,3 +23,5 @@ class IntegracaoGoverno(Base):
     data_resposta: Mapped[datetime | None] = mapped_column(DateTime)
     tentativas: Mapped[int] = mapped_column(Integer, server_default="0")
     mensagem_erro: Mapped[str | None] = mapped_column(Text)
+
+    animal: Mapped[Animal] = relationship(lazy="joined")

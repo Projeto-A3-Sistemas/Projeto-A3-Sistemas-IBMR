@@ -1,5 +1,5 @@
 """Vacinas (P3 - Milestone 3)."""
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, status
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
@@ -8,7 +8,7 @@ from app.db.session import get_db
 from app.models import Vacina
 from app.schemas.vacina import SituacaoVacina, VacinaAtualizar, VacinaCriar, VacinaResposta
 from app.services.erros import tratar_erro_banco
-from app.services.integracao import registrar_envio_antirrabica
+from app.services.integracao import enviar_em_segundo_plano, registrar_envio_antirrabica
 from app.services.vinculos import conferir_animal_e_veterinario
 
 router = APIRouter(prefix="/api/vacinas", tags=["Vacinas"])
@@ -21,25 +21,28 @@ def _buscar(db: Session, vacina_id: int) -> Vacina:
     return vacina
 
 
-def _salvar(db: Session, vacina: Vacina) -> Vacina:
+def _salvar(db: Session, vacina: Vacina, tarefas: BackgroundTasks | None = None) -> Vacina:
     try:
         db.flush()
-        registrar_envio_antirrabica(db, vacina)
+        integracao = registrar_envio_antirrabica(db, vacina)
+        integracao_id = integracao.id if integracao and integracao.situacao != "confirmada" else None
         db.commit()
     except IntegrityError as erro:
         db.rollback()
         raise tratar_erro_banco(erro)
     db.refresh(vacina)
+    if tarefas:
+        enviar_em_segundo_plano(tarefas, integracao_id)
     return vacina
 
 
 @router.post("", response_model=VacinaResposta, status_code=status.HTTP_201_CREATED)
-def registrar(dados: VacinaCriar, db: Session = Depends(get_db)):
+def registrar(dados: VacinaCriar, tarefas: BackgroundTasks, db: Session = Depends(get_db)):
     """Registra uma vacina. Antirrábica aplicada fica pendente de envio ao governo."""
     conferir_animal_e_veterinario(db, dados.animal_id, dados.veterinario_id)
     vacina = Vacina(**dados.model_dump())
     db.add(vacina)
-    return _salvar(db, vacina)
+    return _salvar(db, vacina, tarefas)
 
 
 @router.get("", response_model=list[VacinaResposta])
@@ -65,12 +68,12 @@ def consultar(vacina_id: int, db: Session = Depends(get_db)):
 
 
 @router.put("/{vacina_id}", response_model=VacinaResposta)
-def atualizar(vacina_id: int, dados: VacinaAtualizar, db: Session = Depends(get_db)):
+def atualizar(vacina_id: int, dados: VacinaAtualizar, tarefas: BackgroundTasks, db: Session = Depends(get_db)):
     vacina = _buscar(db, vacina_id)
     conferir_animal_e_veterinario(db, dados.animal_id, dados.veterinario_id)
     for campo, valor in dados.model_dump().items():
         setattr(vacina, campo, valor)
-    return _salvar(db, vacina)
+    return _salvar(db, vacina, tarefas)
 
 
 @router.delete("/{vacina_id}", response_model=VacinaResposta)
