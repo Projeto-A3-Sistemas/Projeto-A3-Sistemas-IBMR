@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useState } from 'react'
-import { demoCredentials, demoVeterinarian } from './clinic/demoData.js'
-import { emptyData, isDemo, repository } from './clinic/repository.js'
+import { demoVeterinarian } from './clinic/demoData.js'
+import { apiAuth, emptyData, isDemo, repository, sessionEndedEvent } from './clinic/repository.js'
+import { Login } from './components/Access.jsx'
 import { ClinicEditor } from './components/forms.jsx'
-import { AnimalPage, AnimalsPage, ConsultationsPage, IntegrationsPage, TutorsPage, VaccinesPage } from './components/screens.jsx'
+import { AnimalPage, AnimalsPage, ConsultationsPage, IntegrationsPage, TutorsPage, VaccinesPage, VeterinariansPage } from './components/screens.jsx'
 import { Button, Icon, Modal } from './components/ui.jsx'
 import './App.css'
 
@@ -13,6 +14,7 @@ const modules = [
   ['consultas', 'Consultas', 'calendar'],
   ['vacinas', 'Vacinas', 'syringe'],
   ['integracoes', 'Integrações', 'link'],
+  ...(!isDemo ? [['veterinarios', 'Veterinários', 'people']] : []),
 ]
 
 function readRoute() {
@@ -25,41 +27,12 @@ function navigate(href) {
   window.location.hash = href
 }
 
-function Login({ onLogin }) {
-  const [error, setError] = useState('')
-  function submit(event) {
-    event.preventDefault()
-    const form = new FormData(event.currentTarget)
-    if (String(form.get('email')).trim().toLowerCase() !== demoCredentials.email || form.get('password') !== demoCredentials.password) {
-      setError('E-mail ou senha inválidos para a demonstração.')
-      return
-    }
-    onLogin()
-  }
-
-  return <main className="login-layout" id="conteudo">
-    <div className="login-panel">
-      <div className="login-mark"><Icon name="paw" size={32} /></div>
-      <h1>Clínica Veterinária</h1>
-      <p className="muted">Acesso veterinário</p>
-      <form className="login-form" onSubmit={submit} onChange={() => error && setError('')}>
-        <label className="field"><span>E-mail</span><input type="email" name="email" autoComplete="username" autoCapitalize="none" placeholder="nome@clinica.com" required /></label>
-        <label className="field"><span>Senha</span><input type="password" name="password" autoComplete="current-password" placeholder="Sua senha de demonstração" required /></label>
-        {error && <p className="notice notice--error" role="alert">{error}</p>}
-        <Button type="submit">Entrar</Button>
-      </form>
-      <div className="login-demo">
-        <p className="muted">{isDemo ? 'Explore o sistema com dados fictícios.' : 'Acesso local para testar a API. A autenticação do servidor está pendente.'}</p>
-        <Button variant="secondary" onClick={onLogin}>{isDemo ? 'Entrar na demonstração' : 'Abrir modo de teste da API'}</Button>
-      </div>
-    </div>
-  </main>
-}
-
-function Sidebar({ section, logout }) {
+function Sidebar({ section, profile, logout, signingOut }) {
+  const names = profile.nome_completo.trim().split(/\s+/)
+  const initials = `${names[0]?.[0] ?? ''}${names.length > 1 ? names.at(-1)[0] : ''}`.toUpperCase()
   return <aside className="sidebar">
     <a className="brand" href="#/animais"><Icon name="paw" size={37} /><span>Clínica<br className="desktop-break" /> Veterinária</span></a>
-    <nav className="main-nav" aria-label="Menu principal">
+    <nav className={isDemo ? 'main-nav' : 'main-nav main-nav--veterinarios'} aria-label="Menu principal">
       {modules.map(([key, label, icon]) =>
         <a key={key} className="nav-item" href={`#/${key}`} aria-current={section === key ? 'page' : undefined}>
           <Icon name={icon} size={22} /><span>{label}</span>
@@ -68,9 +41,9 @@ function Sidebar({ section, logout }) {
     </nav>
     <div className="sidebar-footer">
       <div className="account">
-        <span className="account-avatar" aria-hidden="true">AL</span>
-        <div className="account-copy"><strong>{isDemo ? demoVeterinarian.nome_completo : 'Acesso local'}</strong><small>{isDemo ? 'Veterinária · Demonstração' : 'Sessão de teste local'}</small></div>
-        <button type="button" className="icon-button logout" title="Sair" aria-label="Sair" onClick={logout}><Icon name="logout" size={19} /></button>
+        <span className="account-avatar" aria-hidden="true">{initials}</span>
+        <div className="account-copy"><strong>{profile.nome_completo}</strong><small>{isDemo ? 'Veterinária · Demonstração' : `CRMV-${profile.crmv_uf} ${profile.crmv_numero}`}</small></div>
+        <button type="button" className="icon-button logout" title="Sair" aria-label="Sair" onClick={logout} disabled={signingOut}><Icon name="logout" size={19} /></button>
       </div>
     </div>
   </aside>
@@ -102,10 +75,10 @@ function ConfirmationDialog({ title, description, actionLabel, onClose, onConfir
 }
 
 const saveMethods = {
-  tutor: 'saveTutor', animal: 'saveAnimal', consulta: 'saveAppointment', vacina: 'saveVaccine',
+  tutor: 'saveTutor', animal: 'saveAnimal', veterinario: 'saveVeterinarian', consulta: 'saveAppointment', vacina: 'saveVaccine',
 }
 
-function ClinicWorkspace({ logout }) {
+function ClinicWorkspace({ profile, logout, signingOut }) {
   const [route, setRoute] = useState(readRoute)
   const [data, setData] = useState(emptyData)
   const [loading, setLoading] = useState(true)
@@ -177,7 +150,10 @@ function ClinicWorkspace({ logout }) {
     if (kind === 'microchip') await repository.linkChip(record.id, input, editor.replaceChip)
     else await repository[saveMethods[kind]](input, record?.id)
     await load()
-    const messages = { microchip: 'Vínculo de microchip registrado.', consulta: 'Consulta salva.', vacina: 'Vacina salva.' }
+    const messages = {
+      microchip: 'Vínculo de microchip registrado.', consulta: 'Consulta salva.', vacina: 'Vacina salva.',
+      veterinario: 'Veterinário cadastrado. A pessoa pode usar “Confirmar minha senha” na tela de login para liberar o acesso.',
+    }
     setMessage(messages[kind] ?? 'Registro salvo.')
   }
   async function confirmAction() {
@@ -198,15 +174,16 @@ function ClinicWorkspace({ logout }) {
     animais: route.id ? <AnimalPage key={route.id} data={data} edit={edit} deactivate={deactivate} cancelAppointment={cancelAppointment} cancelVaccine={cancelVaccine} navigate={navigate} id={route.id} tab={route.tab} /> : <AnimalsPage data={data} edit={edit} />,
     consultas: <ConsultationsPage data={data} edit={edit} cancelAppointment={cancelAppointment} />,
     vacinas: <VaccinesPage data={data} edit={edit} cancelVaccine={cancelVaccine} />,
+    veterinarios: <VeterinariansPage data={data} edit={edit} />,
     integracoes: <IntegrationsPage data={data} selectedId={route.id} navigate={navigate} retry={retry} refresh={load} />,
   }
 
   return <div className="app-shell">
     <a className="skip-link" href="#conteudo" onClick={(event) => { event.preventDefault(); document.getElementById('conteudo').focus() }}>Pular para o conteúdo</a>
-    <Sidebar section={route.section} logout={logout} />
+    <Sidebar section={route.section} profile={profile} logout={logout} signingOut={signingOut} />
     <main className="workspace" id="conteudo" tabIndex={-1}>
       <div className="workspace-inner">
-        <div className="mode-line"><span className="mode-pill">{isDemo ? 'Demonstração · Dados fictícios' : 'API da clínica · Acesso local de teste'}</span></div>
+        <div className="mode-line"><span className="mode-pill">{isDemo ? 'Demonstração · Dados fictícios' : 'API da clínica'}</span></div>
         {message && <p className="notice notice--success" role="status">{message}</p>}
         {data.errors.length > 0 && <div className="notice notice--error" role="alert">
           <div><strong>Alguns dados da clínica estão indisponíveis.</strong><ul>{data.errors.map((error) => <li key={error}>{error}</li>)}</ul></div>
@@ -221,15 +198,61 @@ function ClinicWorkspace({ logout }) {
 }
 
 export default function App() {
-  const [signedIn, setSignedIn] = useState(() => sessionStorage.getItem(sessionKey) === '1')
-  function login() {
-    sessionStorage.setItem(sessionKey, '1')
-    setSignedIn(true)
+  const [profile, setProfile] = useState(() => isDemo && sessionStorage.getItem(sessionKey) === '1' ? demoVeterinarian : null)
+  const [checking, setChecking] = useState(() => !isDemo && apiAuth.hasSession())
+  const [signingOut, setSigningOut] = useState(false)
+  const [accessMessage, setAccessMessage] = useState('')
+
+  useEffect(() => {
+    if (isDemo) return
+    let current = true
+    const endSession = (event) => {
+      setProfile(null)
+      setAccessMessage(event.detail)
+    }
+    window.addEventListener(sessionEndedEvent, endSession)
+    if (apiAuth.hasSession()) {
+      apiAuth.profile().then((user) => {
+        if (current) setProfile(user)
+      }).catch((error) => {
+        if (current) setAccessMessage(error.message)
+      }).finally(() => {
+        if (current) setChecking(false)
+      })
+    }
+    return () => {
+      current = false
+      window.removeEventListener(sessionEndedEvent, endSession)
+    }
+  }, [])
+
+  async function login(email, password) {
+    if (isDemo) {
+      sessionStorage.setItem(sessionKey, '1')
+      setProfile(demoVeterinarian)
+    } else {
+      setProfile(await apiAuth.login(email, password))
+    }
+    setAccessMessage('')
   }
-  function logout() {
-    sessionStorage.removeItem(sessionKey)
-    window.history.replaceState(null, '', window.location.pathname + window.location.search)
-    setSignedIn(false)
+  async function logout() {
+    if (signingOut) return
+    setSigningOut(true)
+    let message = ''
+    try {
+      if (isDemo) sessionStorage.removeItem(sessionKey)
+      else await apiAuth.logout()
+    } catch (error) {
+      if (![401, 403].includes(error.status)) {
+        message = 'Sessão encerrada neste navegador. A API não confirmou a revogação.'
+      }
+    } finally {
+      window.history.replaceState(null, '', window.location.pathname + window.location.search)
+      setProfile(null)
+      setSigningOut(false)
+      setAccessMessage(message)
+    }
   }
-  return signedIn ? <ClinicWorkspace logout={logout} /> : <Login onLogin={login} />
+  if (checking) return <main className="login-layout"><p role="status">Verificando sessão…</p></main>
+  return profile ? <ClinicWorkspace profile={profile} logout={logout} signingOut={signingOut} /> : <Login onLogin={login} message={accessMessage} />
 }

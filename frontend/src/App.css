@@ -273,6 +273,7 @@ select { appearance: none; padding-right: 34px; background-image: url("data:imag
   .sidebar-footer { grid-area: 1 / 2; margin: 0; border: 0; padding: 0; }
   .account-avatar, .account-copy { display: none !important; }
   .main-nav { grid-column: 1 / -1; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 4px; }
+  .main-nav.main-nav--veterinarios { grid-template-columns: repeat(6, minmax(0, 1fr)); }
   .nav-item { justify-content: center; gap: 4px; padding: 6px 4px; font-size: .86rem; }
   .nav-item .icon { width: 17px; height: 17px; }
   .workspace { padding-bottom: calc(24px + env(safe-area-inset-bottom)); }
@@ -285,6 +286,7 @@ select { appearance: none; padding-right: 34px; background-image: url("data:imag
   .split > .work-panel { min-height: auto; }
   .toolbar { grid-template-columns: minmax(0, 1fr); gap: 8px; }
   .nav-item { flex-direction: column; min-height: 47px; font-size: .72rem; gap: 3px; }
+  .main-nav.main-nav--veterinarios { grid-template-columns: repeat(3, minmax(0, 1fr)); }
   .data-table, .data-table tbody { display: block; border: 0; overflow: visible; }
   .data-table thead { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
   .data-table tr { display: block; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }

@@ -2,6 +2,16 @@ import { demoRepository } from './demoRepository.js'
 
 export const isDemo = import.meta.env.VITE_CLINIC_MODE !== 'api'
 const apiBase = (import.meta.env.VITE_CLINIC_API_URL || 'http://localhost:8000').replace(/\/+$/, '')
+const accessTokenKey = `sdm:api-session:${apiBase}`
+export const sessionEndedEvent = 'sdm:api-session-ended'
+
+function storedToken() {
+  return sessionStorage.getItem(accessTokenKey)
+}
+
+function clearToken() {
+  sessionStorage.removeItem(accessTokenKey)
+}
 
 const endpoints = {
   tutors: ['/api/tutores', 'tutores'],
@@ -19,12 +29,16 @@ export const emptyData = {
   species: [], breeds: [], errors: [], integrationsAvailable: false,
 }
 
-async function request(path, { method = 'GET', body, timeout = 8000 } = {}) {
+async function request(path, { method = 'GET', body, timeout = 8000, token = storedToken() } = {}) {
   let response
   try {
     response = await fetch(`${apiBase}${path}`, {
       method,
-      headers: { Accept: 'application/json', ...(body ? { 'Content-Type': 'application/json' } : {}) },
+      headers: {
+        Accept: 'application/json',
+        ...(body ? { 'Content-Type': 'application/json' } : {}),
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
       body: body ? JSON.stringify(body) : undefined,
       signal: AbortSignal.timeout(timeout),
     })
@@ -39,9 +53,35 @@ async function request(path, { method = 'GET', body, timeout = 8000 } = {}) {
     if (Array.isArray(data?.detail)) {
       message = data.detail.map(({ loc, msg }) => `${loc?.slice(1).join('.') || 'Dados'}: ${msg}`).join(' · ')
     }
+    if (token && token === storedToken() && [401, 403].includes(response.status)) {
+      clearToken()
+      window.dispatchEvent(new CustomEvent(sessionEndedEvent, { detail: message }))
+    }
     throw Object.assign(new Error(message), { status: response.status })
   }
   return data
+}
+
+export const apiAuth = {
+  hasSession: () => Boolean(storedToken()),
+  profile: () => request('/api/auth/me'),
+  async login(email, senha) {
+    const result = await request('/api/auth/login', { method: 'POST', body: { email, senha }, token: null })
+    const token = result?.access_token
+    if (typeof token !== 'string' || !token) throw new Error('A API não retornou um token de acesso.')
+    const profile = await request('/api/auth/me', { token })
+    sessionStorage.setItem(accessTokenKey, token)
+    return profile
+  },
+  async logout() {
+    try {
+      await request('/api/auth/logout', { method: 'POST' })
+    } finally {
+      clearToken()
+    }
+  },
+  requestPasswordConfirmation: (email) => request('/api/auth/solicitar-confirmacao', { method: 'POST', body: { email }, token: null }),
+  confirmPassword: (token) => request('/api/auth/confirmar-senha', { method: 'POST', body: { token }, token: null }),
 }
 
 const operationNames = {
@@ -98,7 +138,7 @@ const apiRepository = {
     })
     return data
   },
-  saveTutor({ endereco, ...body }, id) {
+  saveTutor({ endereco: _endereco, ...body }, id) {
     if (id) delete body.cpf
     return save('tutors', body, id)
   },
@@ -106,6 +146,7 @@ const apiRepository = {
     return request('/api/enderecos', { method: 'POST', body: { ...address, codigo_ibge: ibge || null } })
   },
   saveAnimal: (body, id) => save('animals', body, id),
+  saveVeterinarian: (body) => save('vets', body),
   saveAppointment: (body, id) => save('appointments', body, id),
   listAnimalAppointments: (id) => listAnimalRecords('appointments', id),
   cancelAppointment: (id) => request(`/api/consultas/${id}`, { method: 'DELETE' }),

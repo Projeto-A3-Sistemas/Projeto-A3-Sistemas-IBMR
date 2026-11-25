@@ -175,6 +175,37 @@ function TutorEditor({ record, data, onClose, onSave }) {
   </Editor>
 }
 
+function VeterinarianEditor({ onClose, onSave }) {
+  function read(fields) {
+    const cpf = digits(fields.cpf)
+    const phone = digits(fields.telefone)
+    const name = fields.nome_completo.trim()
+    const crmv = fields.crmv_numero.trim()
+    if (name.length < 3) throw new Error('Informe o nome completo do veterinário.')
+    if (!validCpf(cpf)) throw new Error('Informe um CPF válido.')
+    if (phone.length < 10) throw new Error('Informe um telefone com DDD.')
+    if (!crmv) throw new Error('Informe o número do CRMV.')
+    if (new TextEncoder().encode(fields.senha).length > 72) throw new Error('A senha é longa demais. Use uma senha mais curta.')
+    if (fields.senha !== fields.confirmacao) throw new Error('As senhas precisam ser iguais.')
+    return {
+      nome_completo: name, cpf, telefone: phone, crmv_numero: crmv, crmv_uf: fields.crmv_uf,
+      email: fields.email.trim().toLowerCase(), senha: fields.senha,
+    }
+  }
+
+  return <Editor title="Cadastrar veterinário" onClose={onClose} onSave={onSave} read={read}>
+    <Field name="nome_completo" label="Nome completo" required minLength={3} maxLength={150} />
+    <Field name="cpf" label="CPF" inputMode="numeric" required maxLength={14} />
+    <Field name="email" label="E-mail" type="email" required />
+    <Field name="telefone" label="Telefone" type="tel" required maxLength={20} />
+    <Field name="crmv_numero" label="Número do CRMV" required maxLength={15} />
+    <Select name="crmv_uf" label="UF do CRMV" required defaultValue="" items={ufOptions.map((uf) => [uf, uf])} />
+    <Field name="senha" label="Senha" type="password" autoComplete="new-password" required minLength={8} maxLength={72} />
+    <Field name="confirmacao" label="Repetir senha" type="password" autoComplete="new-password" required minLength={8} maxLength={72} />
+    <p className="field--wide muted">Use pelo menos 8 caracteres. A conta precisa confirmar a senha antes do primeiro acesso.</p>
+  </Editor>
+}
+
 function AnimalEditor({ record, data, onClose, onSave }) {
   const [species, setSpecies] = useState(String(record?.especie?.id ?? ''))
   const [breed, setBreed] = useState(String(record?.raca?.id ?? ''))
@@ -311,7 +342,7 @@ function ChipEditor({ record, replaceChip, data, onClose, onSave }) {
   </Editor>
 }
 
-const editors = { tutor: TutorEditor, animal: AnimalEditor, consulta: AppointmentEditor, vacina: VaccineEditor, microchip: ChipEditor }
+const editors = { tutor: TutorEditor, animal: AnimalEditor, veterinario: VeterinarianEditor, consulta: AppointmentEditor, vacina: VaccineEditor, microchip: ChipEditor }
 
 export function ClinicEditor({ editor, data, onClose, onSave }) {
   const Form = editors[editor.kind]

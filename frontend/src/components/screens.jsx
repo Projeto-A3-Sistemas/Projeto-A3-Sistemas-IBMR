@@ -88,6 +88,28 @@ export function AnimalsPage({ data, edit }) {
   </>
 }
 
+export function VeterinariansPage({ data, edit }) {
+  const [query, setQuery] = useState('')
+  const vets = data.vets.filter((vet) => matches(query, vet.nome_completo, vet.email, vet.crmv_numero, vet.crmv_uf))
+  const columns = [
+    { key: 'name', label: 'Veterinário', render: (vet) => <strong>{vet.nome_completo}</strong> },
+    { key: 'email', label: 'E-mail', render: (vet) => vet.email },
+    { key: 'license', label: 'CRMV', render: (vet) => `${vet.crmv_uf} ${vet.crmv_numero}` },
+    { key: 'status', label: 'Situação da senha', render: (vet) => vet.senha_confirmada
+      ? <Status value="confirmada" label="Confirmada" />
+      : <Status value="pendente" label="Confirmação pendente" /> },
+  ]
+  return <>
+    <PageHeader title="Veterinários" description="Profissionais ativos cadastrados na clínica.">
+      <Button icon="plus" onClick={() => edit('veterinario')}>Cadastrar veterinário</Button>
+    </PageHeader>
+    <section className="panel directory-panel">
+      <Search label="Buscar por nome, e-mail ou CRMV" value={query} onChange={setQuery} />
+      <DataTable columns={columns} rows={vets} label="Veterinários cadastrados" empty="Nenhum veterinário encontrado." />
+    </section>
+  </>
+}
+
 function AppointmentDetails({ record, data, edit, cancelAppointment, showAnimalLink = true }) {
   if (!record) return <p className="empty">Selecione uma consulta para ver os detalhes.</p>
   const animal = find(data.animals, record.animal.id)
@@ -262,9 +284,11 @@ function useAnimalHistory(animalId, records, list, enabled = !isDemo, demoItems 
   useEffect(() => {
     if (!enabled || !animalId) return
     let current = true
-    setError('')
     list(animalId).then((result) => {
-      if (current) setHistory(result)
+      if (current) {
+        setHistory(result)
+        setError('')
+      }
     }).catch((error) => {
       if (current) setError(error.message)
     })
@@ -275,7 +299,10 @@ function useAnimalHistory(animalId, records, list, enabled = !isDemo, demoItems 
     items: enabled ? history ?? [] : demoItems,
     loading: enabled && !history,
     error,
-    retry: () => setReload((value) => value + 1),
+    retry: () => {
+      setError('')
+      setReload((value) => value + 1)
+    },
   }
 }
 
