@@ -17,3 +17,8 @@ DATABASE_URL = os.getenv(
 )
 JWT_SECRET = os.getenv("JWT_SECRET", "troque-esta-chave")
 GOVERNO_API_URL = os.getenv("GOVERNO_API_URL", "http://localhost:8001")
+
+# Integração com a API governamental (Milestone 4)
+GOVERNO_TIMEOUT_SEGUNDOS = float(os.getenv("GOVERNO_TIMEOUT_SEGUNDOS", "5"))
+# De quanto em quanto tempo as comunicações pendentes são reenviadas (0 = desliga)
+INTEGRACAO_INTERVALO_SEGUNDOS = int(os.getenv("INTEGRACAO_INTERVALO_SEGUNDOS", "60"))

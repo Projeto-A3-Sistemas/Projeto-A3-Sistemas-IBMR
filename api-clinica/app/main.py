@@ -10,11 +10,13 @@ from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import text
 
 from app.db.session import engine
+from app.services.reenvio import ciclo_de_vida
 
 app = FastAPI(
     title="SDM - API da Clinica",
     description="API privada do Sistema de Gestao de Clinica Veterinaria.",
     version="0.1.0",
+    lifespan=ciclo_de_vida,
 )
 
 # Libera o frontend (React/Vite) a chamar a API
@@ -39,11 +41,37 @@ def health():
     return {"api": "ok", "banco": banco}
 
 
-# ---- Rotas dos modulos (descomente quando cada parte estiver pronta) ----
-# from app.routers import auth, tutores, animais, veterinarios, especies, racas
-# app.include_router(auth.router)
-# app.include_router(tutores.router)
-# app.include_router(animais.router)
-# app.include_router(veterinarios.router)
-# app.include_router(especies.router)
-# app.include_router(racas.router)
+# ---- Login (P1) ----
+# /health e /api/auth ficam publicos. Toda rota registrada DEPOIS deste bloco
+# exige login de veterinario ativo e com senha confirmada.
+from fastapi import Depends  # noqa: E402
+
+from app.deps import get_current_veterinario  # noqa: E402
+from app.routers import auth  # noqa: E402
+
+app.include_router(auth.router)
+app.router.dependencies.append(Depends(get_current_veterinario))
+
+
+# ---- Rotas dos modulos ----
+from app.routers import animais, consultas, tutores, vacinas, veterinarios  # noqa: E402
+
+app.include_router(tutores.router)
+app.include_router(animais.router)
+app.include_router(veterinarios.router)
+app.include_router(consultas.router)
+app.include_router(vacinas.router)
+
+# P3 - microchip e integração com o governo (Milestone 4)
+from app.routers import integracoes, microchips  # noqa: E402
+
+app.include_router(microchips.router)
+app.include_router(integracoes.router)
+
+# P4 - especies, racas, enderecos e CEP
+from app.routers import cep, enderecos, especies, racas  # noqa: E402
+
+app.include_router(especies.router)
+app.include_router(racas.router)
+app.include_router(enderecos.router)
+app.include_router(cep.router)
