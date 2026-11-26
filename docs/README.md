@@ -22,7 +22,7 @@ Acesso rápido aos documentos principais e artefatos técnicos organizados na pa
 
 * **Desenho da arquitetura**
   * [Leitura e diagrama nesta página — Seção 3](#3-desenho-da-arquitetura)
-  * [Imagem do Desenho da Arquitetura (PNG)](./arquitetura.png)
+  * [Imagem do Desenho da Arquitetura (PNG)](./docs/arquitetura.md)
 
 * **Relatório de testes (entrega final)**
   * [Matriz de cobertura nesta página — Seção 4](#4-relatório-de-testes-entrega-final)
