@@ -18,7 +18,7 @@ Acesso rápido aos documentos principais e artefatos técnicos organizados na pa
   * [Diagrama Entidade-Relacionamento — Arquivo editável Draw.io (.drawio)](./modelo-dados/MER_conceitual_clinica_vet_atributos.drawio)
   * [Modelo Relacional — PostgreSQL (PNG)](./modelo-dados/MER_clinica_vet.png)
   * [Modelo Relacional — Estrutura do banco pgAdmin (.pgerd)](./modelo-dados/ERD_clinica_vet.pgerdet.pgerd)
-  * [Diagrama ER em Código Mermaid — Clínica e Governo (MD)](./diagrama-er.md)
+  * [Diagrama ER em Código Mermaid — Clínica e Governo (MD)](docs/diagrama-er.md)
 
 * **Desenho da arquitetura**
   * [Leitura e diagrama nesta página — Seção 3](#3-desenho-da-arquitetura)
