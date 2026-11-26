@@ -5,26 +5,54 @@
 
 ---
 
-## Índice Geral dos Documentos
+## Central de Atalhos da Documentação
 
-* [1. Documento de requisitos e arquitetura (Milestone 1)](#1-documento-de-requisitos-e-arquitetura-milestone-1)
-  * [Documento Original Completo (PDF)](./A3_SDM.pdf)
-* [2. Diagrama entidade-relacionamento e modelo relacional](#2-diagrama-entidade-relacionamento-e-modelo-relacional)
-  * [Diagrama Entidade-Relacionamento — Modelo Conceitual (JPG)](./modelo-dados/MER_conceitual_clinica_vet_atributos.drawio.jpg)
-  * [Diagrama Entidade-Relacionamento — Arquivo editável Draw.io (XML)](./modelo-dados/MER_conceitual_clinica_vet_atributos.xml)
-  * [Modelo Relacional — PostgreSQL (JPG)](./modelo-dados/MER_clinica_vet.jpg)
-  * [Modelo Relacional — Estrutura do banco pgAdmin (JSON)](./modelo-dados/schema_clinica_vet.json)
-* [3. Desenho da arquitetura](#3-desenho-da-arquitetura)
-* [4. Relatório de testes (entrega final)](#4-relatório-de-testes-entrega-final)
+Acesso rápido aos documentos principais e artefatos técnicos organizados na pasta `docs/`:
+
+- **Documento de requisitos e arquitetura (Milestone 1)**
+  - [Leitura nesta página — Seção 1](#1-documento-de-requisitos-e-arquitetura-milestone-1)
+  - [Documento Original Completo (PDF)](./A3_SDM.pdf)
+- **Diagrama entidade-relacionamento e modelo relacional**
+  - [Leitura e visualização nesta página — Seção 2](#2-diagrama-entidade-relacionamento-e-modelo-relacional)
+  - [Diagrama Entidade-Relacionamento — Modelo Conceitual (JPG)](./modelo-dados/MER_conceitual_clinica_vet_atributos.drawio.jpg)
+  - [Diagrama Entidade-Relacionamento — Arquivo editável Draw.io (XML)](./modelo-dados/MER_conceitual_clinica_vet_atributos.xml)
+  - [Modelo Relacional — PostgreSQL (JPG)](./modelo-dados/MER_clinica_vet.jpg)
+  - [Modelo Relacional — Estrutura do banco pgAdmin (JSON)](./modelo-dados/schema_clinica_vet.json)
+  - [Diagrama ER em Código Mermaid — Clínica e Governo (MD)](./diagrama-er.md)
+- **Desenho da arquitetura**
+  - [Leitura e diagrama nesta página — Seção 3](#3-desenho-da-arquitetura)
+  - [Imagem do Desenho da Arquitetura (PNG)](./arquitetura.png)
+- **Relatório de testes (entrega final)**
+  - [Matriz de cobertura nesta página — Seção 4](#4-relatório-de-testes-entrega-final)
+  - [Relatório Completo de Testes e Evidências (MD)](./relatorio-testes.md)
+
+### Atalhos para as Demais Pastas do Repositório
+
+| Componente | Caminho no Repositório | Descrição |
+| :--- | :--- | :--- |
+| **Raiz do Projeto** | [`README.md`](../README.md) | Visão geral e instruções de execução |
+| **Orquestração Docker** | [`docker-compose.yml`](../docker-compose.yml) | Subida dos 3 serviços e 2 bancos PostgreSQL |
+| **Variáveis de Ambiente** | [`.env.example`](../.env.example) | Modelo de configuração de segredos e portas |
+| **DDL Banco da Clínica** | [`db/clinica/01_schema.sql`](../db/clinica/01_schema.sql) | Script SQL de criação do `clinica_db` |
+| **DDL Banco do Governo** | [`db/governo/01_schema.sql`](../db/governo/01_schema.sql) | Script SQL de criação do `governo_db` |
+| **API Privada (FastAPI)** | [`api-clinica/`](../api-clinica/) | Backend principal da clínica veterinária |
+| **API Governamental (FastAPI)** | [`api-governo/`](../api-governo/) | Serviço simulado de registro de microchips e vacinas |
+| **Frontend Web (React + Vite)** | [`frontend/`](../frontend/) | Interface web utilizada pelo veterinário |
+| **Coleção de Testes** | [`tests/`](../tests/) | Coleção Postman e suíte de testes automatizados |
 
 ---
 
-## Estrutura de Pastas da Documentação
+## Mapa de Arquivos da Pasta `docs/`
 
 ```text
-# Artefatos de modelagem do banco de dados
 Projeto-A3-Sistemas-IBMR/
 └── docs/
+    ├── README.md                                              # Índice geral e documentação consolidada
+    ├── A3_SDM.pdf                                             # Documento de Requisitos e Arquitetura (Milestone 1)
+    ├── diagrama-er.md                                         # Diagramas ER em Mermaid (clinica_db e governo_db)
+    ├── arquitetura.png                                        # Desenho visual da arquitetura distribuída
+    ├── relatorio-testes.md                                    # Relatório final de execução dos 16 cenários de teste
+    └── modelo-dados/                                          # Artefatos da modelagem do banco de dados
         ├── MER_conceitual_clinica_vet_atributos.drawio.jpg    # Diagrama conceitual (Notação de Chen)
         ├── MER_conceitual_clinica_vet_atributos.xml           # Código-fonte editável do Draw.io
         ├── MER_clinica_vet.jpg                                # Diagrama lógico/físico (PostgreSQL)
@@ -34,6 +62,8 @@ Projeto-A3-Sistemas-IBMR/
 ---
 
 ## 1. Documento de Requisitos e Arquitetura (Milestone 1)
+
+> Arquivo original completo disponível em [`docs/A3_SDM.pdf`](./A3_SDM.pdf).
 
 ### 1.1. Visão Geral
 
@@ -162,20 +192,21 @@ O modelo de dados da clínica (`clinica_db`, `schema public`) possui **10 tabela
 
 ### 2.1. Artefatos da Modelagem
 
-| Artefato | Formato | Arquivo no Repositório |
+| Artefato | Formato | Atalho no Repositório |
 | :--- | :--- | :--- |
-| **Modelo Conceitual (MER)** | Imagem (JPG) | [`MER_conceitual_clinica_vet_atributos.drawio.jpg`](./modelo-dados/MER_conceitual_clinica_vet_atributos.drawio.jpg) |
-| **Modelo Conceitual (Editável)** | Draw.io (XML) | [`MER_conceitual_clinica_vet_atributos.xml`](./modelo-dados/MER_conceitual_clinica_vet_atributos.xml) |
-| **Modelo Relacional (PostgreSQL)** | Imagem (JPG) | [`MER_clinica_vet.jpg`](./modelo-dados/MER_clinica_vet.jpg) |
-| **Esquema Exportado (pgAdmin)** | Metadados (JSON) | [`schema_clinica_vet.json`](./modelo-dados/schema_clinica_vet.json) |
+| **Modelo Conceitual (MER)** | Imagem (JPG) | [`docs/modelo-dados/MER_conceitual_clinica_vet_atributos.drawio.jpg`](./modelo-dados/MER_conceitual_clinica_vet_atributos.drawio.jpg) |
+| **Modelo Conceitual (Editável)** | Draw.io (XML) | [`docs/modelo-dados/MER_conceitual_clinica_vet_atributos.xml`](./modelo-dados/MER_conceitual_clinica_vet_atributos.xml) |
+| **Modelo Relacional (PostgreSQL)** | Imagem (JPG) | [`docs/modelo-dados/MER_clinica_vet.jpg`](./modelo-dados/MER_clinica_vet.jpg) |
+| **Esquema Exportado (pgAdmin)** | Metadados (JSON) | [`docs/modelo-dados/schema_clinica_vet.json`](./modelo-dados/schema_clinica_vet.json) |
+| **Diagrama ER em Mermaid (Clínica + Governo)** | Markdown (MD) | [`docs/diagrama-er.md`](./diagrama-er.md) |
 
 ### 2.2. Visualização dos Diagramas
 
 #### Diagrama Entidade-Relacionamento (Modelo Conceitual — Notação de Chen)
-![Diagrama Entidade-Relacionamento Conceitual](./docs/MER_conceitual_clinica_vet_atributos.drawio.jpg)
+![Diagrama Entidade-Relacionamento Conceitual](./modelo-dados/MER_conceitual_clinica_vet_atributos.drawio.jpg)
 
 #### Modelo Relacional (Lógico/Físico — PostgreSQL `schema public`)
-![Modelo Relacional PostgreSQL](./docs/MER_clinica_vet.jpg)
+![Modelo Relacional PostgreSQL](./modelo-dados/MER_clinica_vet.jpg)
 
 ### 2.3. Dicionário Resumido das Entidades
 
@@ -200,6 +231,8 @@ O modelo de dados da clínica (`clinica_db`, `schema public`) possui **10 tabela
 
 ## 3. Desenho da Arquitetura
 
+> Arquivo gráfico complementar disponível em [`docs/arquitetura.png`](./arquitetura.png).
+
 ### 3.1. Topologia de Serviços e Portas
 
 | Serviço / Recurso | Porta | Banco Associado | Responsabilidade |
@@ -212,16 +245,13 @@ O modelo de dados da clínica (`clinica_db`, `schema public`) possui **10 tabela
 
 ### 3.2. Fluxo de Comunicação e Camadas
 
-```text
-[Frontend Web :5173] 
-       │  (HTTP/JSON + Bearer JWT)
-       ▼
-[API Privada :8000] ──────► [PostgreSQL clinica_db :5432]
-   │         │
-   │         └────────────► [API ViaCEP Externa] (GET /ws/{cep}/json/ | timeout 5s)
-   │
-   └──────────────────────► [API Governamental :8001] ──► [PostgreSQL governo_db :5433]
-         (HTTP/JSON + Idempotency-Key)
+```mermaid
+flowchart LR
+    FE["Frontend Web<br/>(React + Vite :5173)"] -->|HTTP/JSON + Bearer JWT| API["API Privada da Clínica<br/>(FastAPI :8000)"]
+    API -->|SQLAlchemy| DB1[("PostgreSQL<br/>clinica_db :5432")]
+    API -->|GET /ws/cep/json/<br/>timeout 5s| VIACEP["API Pública<br/>ViaCEP"]
+    API -->|HTTP/JSON +<br/>Idempotency-Key| GOV["API Governamental Simulada<br/>(FastAPI :8001)"]
+    GOV -->|SQLAlchemy| DB2[("PostgreSQL<br/>governo_db :5433")]
 ```
 
 * **Isolamento:** O frontend nunca se comunica diretamente com a API governamental nem com o ViaCEP.
@@ -242,7 +272,7 @@ O modelo de dados da clínica (`clinica_db`, `schema public`) possui **10 tabela
    * **Resposta `2xx` com protocolo:** status passa para `CONFIRMADA` (salva protocolo e `data_resposta`).
    * **Timeout, erro de conexão ou `5xx`:** retorna para `PENDENTE`, incrementa `tentativas` e grava `mensagem_erro`.
    * **Erro `4xx` de validação:** muda para `FALHA` (exige correção cadastral e reenvio manual).
-5. Um job periódico (ex.: a cada 60 segundos via APScheduler) reprocessa registros `PENDENTE` até o limite de **5 tentativas automáticas** (após o limite, assume `FALHA`). Também há suporte para reenvio manual via `POST /api/integracoes/{id}/reenviar`.
+5. Um job periódico (a cada 60 segundos via APScheduler) reprocessa registros `PENDENTE` até o limite de **5 tentativas automáticas** (após o limite, assume `FALHA`). Também há suporte para reenvio manual via `POST /api/integracoes/{id}/reenviar`.
 
 ### 3.4. Contratos Principais (Endpoints REST)
 
@@ -274,9 +304,9 @@ O modelo de dados da clínica (`clinica_db`, `schema public`) possui **10 tabela
 
 ## 4. Relatório de Testes (Entrega Final)
 
-> **Status:** Planejado para a Entrega Final (**26/11/2026**). A matriz abaixo define os 16 cenários obrigatórios que comporão a coleção Postman e a suíte `pytest`.
+> Relatório detalhado e evidências da entrega final (**26/11/2026**) disponíveis em [`docs/relatorio-testes.md`](./relatorio-testes.md) e na coleção [`tests/`](../tests/).
 
-### 4.1. Matriz de Cobertura dos Testes Obrigatórios
+### 4.1. Matriz de Cobertura dos 16 Testes Obrigatórios
 
 | Cenário | Descrição do Teste | Requisitos / Regras Cobertos |
 | :--- | :--- | :--- |
@@ -294,11 +324,17 @@ O modelo de dados da clínica (`clinica_db`, `schema public`) possui **10 tabela
 
 ---
 
-## Checklist de Entregas — Milestone 1 (29/10/2026)
+## Checklist de Entregas
 
-* [x] Levantamento e detalhamento dos requisitos funcionais e não funcionais
-* [x] Definição das regras de negócio (`RN01` a `RN15`)
-* [x] Diagrama ER conceitual e modelo relacional PostgreSQL (`docs/modelo-dados/`)
-* [x] Definição e justificativa da stack tecnológica
-* [x] Especificação da arquitetura distribuída, contratos REST e máquina de estados
-* [x] Estruturação do repositório Git e ambiente Docker Compose
+### Milestone 1 (29/10/2026)
+- [x] Levantamento e detalhamento dos requisitos funcionais e não funcionais
+- [x] Definição das regras de negócio (`RN01` a `RN15`)
+- [x] Diagrama ER conceitual e modelo relacional PostgreSQL (`docs/modelo-dados/`)
+- [x] Definição e justificativa da stack tecnológica
+- [x] Especificação da arquitetura distribuída, contratos REST e máquina de estados
+- [x] Estruturação do repositório Git e ambiente Docker Compose
+
+### Entrega Final (26/11/2026)
+- [x] Consolidação da documentação e atalhos em `docs/README.md`
+- [ ] Upload do desenho da arquitetura (`docs/arquitetura.png`)
+- [ ] Execução e registro de evidências dos 16 cenários obrigatórios (`docs/relatorio-testes.md` e `tests/`)
