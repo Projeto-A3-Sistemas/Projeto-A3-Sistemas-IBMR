@@ -38,6 +38,28 @@ Confira se subiu: http://localhost:8000/health e http://localhost:8001/health de
 > Já tem PostgreSQL instalado usando a porta 5432? No `.env`, troque `CLINICA_DB_PORT=5432`
 > por `CLINICA_DB_PORT=5434`.
 
+
+## Como abrir o frontend
+
+Com as APIs no ar (passo acima), em outro terminal, na pasta do projeto:
+
+```bash
+cd frontend
+
+# Usar a API de verdade (só na primeira vez)
+# Windows (PowerShell):
+Set-Content .env.local "VITE_CLINIC_MODE=api`nVITE_CLINIC_API_URL=http://localhost:8000"
+# Linux/Mac:
+# printf "VITE_CLINIC_MODE=api\nVITE_CLINIC_API_URL=http://localhost:8000\n" > .env.local
+
+npm ci
+npm run dev -- --strictPort
+```
+
+Abra http://localhost:5173 e entre com `ana@clinica.com` / `Senha@123`.
+Precisa do **Node.js 24**. No PowerShell, se o `npm` for bloqueado, use `npm.cmd`.
+Mais detalhes em [`frontend/README.md`](frontend/README.md).
+
 ## Como rodar sem Docker (VS Code)
 
 1. Instale o PostgreSQL 17 ou 18. Crie dois bancos: `clinica_db` e `governo_db`.
