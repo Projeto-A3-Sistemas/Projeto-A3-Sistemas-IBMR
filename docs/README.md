@@ -172,10 +172,10 @@ O modelo de dados da clínica (`clinica_db`, `schema public`) possui **10 tabela
 ### 2.2. Visualização dos Diagramas
 
 #### Diagrama Entidade-Relacionamento (Modelo Conceitual — Notação de Chen)
-![Diagrama Entidade-Relacionamento Conceitual](./modelo-dados/MER_conceitual_clinica_vet_atributos.drawio.jpg)
+![Diagrama Entidade-Relacionamento Conceitual](./docs/MER_conceitual_clinica_vet_atributos.drawio.jpg)
 
 #### Modelo Relacional (Lógico/Físico — PostgreSQL `schema public`)
-![Modelo Relacional PostgreSQL](./modelo-dados/MER_clinica_vet.jpg)
+![Modelo Relacional PostgreSQL](./docs/MER_clinica_vet.jpg)
 
 ### 2.3. Dicionário Resumido das Entidades
 
