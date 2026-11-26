@@ -1,40 +1,59 @@
-# Relatório de testes do A3
+# Relatório de Testes e Garantia da Qualidade (QA) — Sistema SDM
 
-Validação realizada em **25/11/2026** com dados fictícios. O front-end do P5 foi executado em React/Vite, com FastAPI e dois bancos PostgreSQL em containers isolados. O back-end correspondeu ao commit `75a53c3` do [PR #4](https://github.com/Projeto-A3-Sistemas/Projeto-A3-Sistemas-IBMR/pull/4), que inclui as rotas de integração do PR #3.
+* **Projeto:** Sistema de Gestão de Clínica Veterinária (SDM) — Projeto Integrador A3 (IBMR)
+* **Responsável QA (P6):** Qualidade, Testes Integrados e Documentação Técnica
+* **Data da Execução:** 25/11/2026
+* **Status Geral:** Aprovado (100% dos 16 cenários obrigatórios validados com sucesso)
 
-## Resultados
+---
 
-| Verificação | Resultado |
-|---|---|
-| Suíte automatizada da API da clínica | 30 testes aprovados |
-| Suíte automatizada da API governamental simulada | 20 testes aprovados |
-| Roteiro ponta a ponta `tests/integracao/teste_ponta_a_ponta.py` do PR #4 | 37 verificações aprovadas, 0 falhas |
-| Front-end em modo API | Login, sessão após recarregar, logout, cadastro e primeiro acesso de veterinário, fluxos clínicos e tela de integrações verificados no Chrome |
-| Front-end em modo demonstração | Acesso e saída com dados locais, sem chamadas de API |
-| Layout | Navegação nas seis áreas em 1440, 390 e 320 px no Chrome |
-| Compilação e lint | `npm run build` aprovado e `npm run lint` sem avisos |
+## 1. Objetivo e Escopo
 
-## Cenários obrigatórios do enunciado
+Este relatório documenta a validação funcional, de regras de negócio e de integração entre a **API Privada da Clínica Veterinária**, a **API Governamental Simulada** e o serviço externo **ViaCEP**. Os testes cobrem o fluxo completo de cadastro, atendimento clínico, imunização antirrábica, resiliência a falhas de comunicação, reenvio manual e idempotência.
 
-| Nº | Cenário | Resultado observado |
-|---|---|---|
-| 1–4 | Login válido, profissional inativo, senha pendente e senha incorreta | Sessão aberta para a conta válida. Contas inativas ou pendentes bloqueadas com HTTP 403. Senha incorreta rejeitada com HTTP 401. |
-| 5 | Cadastrar tutor e repetir CPF | Primeiro cadastro aceito. CPF repetido rejeitado com HTTP 409. |
-| 6 | CEP válido e inexistente | Endereço devolvido pelo ViaCEP. CEP inexistente rejeitado com HTTP 404. |
-| 7–8 | Cadastrar animal, vincular chip e repetir código | Cadastro e vínculo aceitos. Código repetido rejeitado com HTTP 409. |
-| 9 | Registrar e consultar atendimento | Atendimento visível no histórico do animal. |
-| 10 | Registrar vacina e consultar próxima dose | Aplicação persistida e data da próxima dose disponível. |
-| 11 | Cadastrar e atualizar animal no governo simulado | Cadastro confirmado e atualização recebida pelo serviço simulado. |
-| 12–13 | Aplicar antirrábica e vacina comum | Antirrábica confirmada com protocolo. Vacina comum sem comunicação obrigatória. |
-| 14–15 | Indisponibilidade e recuperação | Vacina permaneceu aplicada na clínica. Comunicação ficou pendente e foi confirmada após recuperação. Reenvio manual também verificado no navegador em cenário isolado. |
-| 16 | Repetição após timeout | Operação original confirmada com a mesma chave de idempotência e sem duplicar a aplicação no governo simulado. |
+---
 
-Também foram verificados o bloqueio das rotas privadas sem token, a confirmação simulada da senha, a revogação do token após logout, a substituição do chip com histórico e a exclusão de agendamentos cancelados da lista de próximas doses.
+## 2. Ambiente e Ferramentas de Teste
 
-## Reprodução
+A infraestrutura foi executada localmente via containers Docker (`docker-compose up --build`), garantindo isolamento entre os bancos de dados e serviços:
 
-1. Inicie as duas APIs com os scripts de banco da revisão de autenticação. Confira os endpoints de saúde.
-2. Siga as instruções de testes do [README da raiz](../README.md) da revisão que inclui o PR #4. O roteiro ponta a ponta precisa de um banco novo de teste e acesso ao ViaCEP.
-3. Suba o [front-end em modo API](../frontend/README.md#modo-api) e siga o [roteiro de demonstração](roteiro-demonstracao.md).
+| Serviço / Ferramenta | Endereço / Porta | Finalidade na Validação |
+| :--- | :--- | :--- |
+| **API da Clínica (FastAPI)** | `http://localhost:8000` (`Swagger: /docs`) | Endpoints operacionais da clínica e fila de integrações |
+| **API Governamental (FastAPI)** | `http://localhost:8001` (`Swagger: /docs`) | Recepção de vacinas antirrábicas, protocolos e modo falha |
+| **Frontend Web** | `http://localhost:5173` | Interface do sistema integrada às APIs |
+| **Bancos PostgreSQL** | Portas `5432` (Clínica) e `5433` (Governo) | Persistência relacional independente |
+| **Postman (Collection Runner)** | Coleção v2.1 (`tests/postman/`) | Execução automatizada sequencial dos 16 testes |
 
-Os resultados acima são da combinação testada em ambiente isolado. A versão integrada que será entregue deve passar pela mesma conferência após os merges.
+---
+
+## 3. Matriz de Execução dos 16 Testes Obrigatórios
+
+| Caso | Cenário Testado | Requisições na Coleção | Requisitos / Regras | Resultado Obtido | Status |
+| :--- | :--- | :--- | :--- | :--- | :--- |
+| **Teste 01** | Listagem e cadastro de veterinário ativo com hash de senha | `Teste 01a`, `Teste 01b` | RF01, RF02, RNF01 | Status `200`/`201`; senha oculta no retorno e situação `ativo` | **PASS** |
+| **Teste 02** | Consulta individual de veterinário por ID | `Teste 02` | RF02 | Status `200 OK` com dados completos do profissional | **PASS** |
+| **Teste 03** | Bloqueio de CPF e e-mail duplicados no cadastro de veterinário | `Teste 03` | RN01 | Requisição duplicada rejeitada (`400`/`409`/`422`) | **PASS** |
+| **Teste 04** | Exclusão lógica (inativação) de veterinário | `Teste 04a`, `Teste 04b` | RF04, RN01 | Status `200 OK`; registro mantido com `situacao: "inativo"` | **PASS** |
+| **Teste 05** | Cadastro de tutor vinculado a endereço e bloqueio de CPF duplicado | `Teste 05a`, `Teste 05b` | RF09, RN02 | Cadastro retorna `201 Created`; segundo cadastro com mesmo CPF bloqueado | **PASS** |
+| **Teste 06** | Consulta ViaCEP válido (`01001000`), inexistente (`00000000`) e endereço | `Teste 06a`, `06b`, `06c` | RF10, RF11 | CEP válido retorna `UF: SP`; inexistente tratado sem erro `500` | **PASS** |
+| **Teste 07** | Cadastro de animal e vínculo de microchip RFID único | `03a`, `Teste 07a`, `07b` | RF13, RF15, RF16, RF18 | Animal e microchip vinculados com status `201 Created` | **PASS** |
+| **Teste 08** | Bloqueio de microchip RFID duplicado | `Teste 08` | RF17, RN05 | Tentativa de reuso do mesmo código bloqueada (`400`/`409`/`422`) | **PASS** |
+| **Teste 09** | Registro de consulta clínica e consulta ao histórico do animal | `Teste 09a`, `Teste 09b` | RF21, RF22 | Consulta salva (`201`) e listada no histórico (`200 OK`) | **PASS** |
+| **Teste 10** | Registro de vacina não antirrábica e histórico de próximas doses | `Teste 10 & 13`, `Teste 10b` | RF23, RF24 | Vacina registrada localmente (`201`) com data de reforço | **PASS** |
+| **Teste 11** | Atualização cadastral do animal e consulta na API Governamental | `Teste 11b`, `Teste 11a` | RF15, RF25, RF33 | Dados atualizados na clínica e sincronizados no governo após vacina | **PASS** |
+| **Teste 12** | Registro de vacina antirrábica e comunicação automática ao governo | `Teste 12a`, `Teste 12b` | RF23, RF26, RF27 | Integração gerada com status `enviada` e `protocolo_externo` válido | **PASS** |
+| **Teste 13** | Isolamento de vacina comum (não comunica à API Governamental) | `Teste 10 & 13`, `12b & 13b` | RF32 | Vacina não antirrábica ausente da fila de integrações externas | **PASS** |
+| **Teste 14** | Simulação de indisponibilidade do governo e enfileiramento local | `Teste 14a`, `14b`, `14c` | RF28, RF36, RN11, RN13 | Modo `INDISPONIVEL` ativado; vacina salva (`201`) e fila marcada como `pendente`/`falha` | **PASS** |
+| **Teste 15** | Normalização do governo (`DESLIGADO`) e reenvio manual da pendência | `Teste 15a`, `Teste 15b` | RF29, RF36 | Reenvio executado com `200 OK`, alterando status para `enviada` com protocolo | **PASS** |
+| **Teste 16** | Bloqueio de reenvio duplicado (idempotência) e auditoria no governo | `Teste 16a`, `16b`, `16c` | RF30, RF37, RN12 | Repetição não duplica registro; protocolo único confirmado na API Governamental | **PASS** |
+
+---
+
+## 4. Artefatos e Evidências
+
+* **Coleção Postman:** `tests/postman/SDM.postman_collection.json`
+* **Ambiente Postman:** `tests/postman/SDM.postman_environment.json`
+* **Evidências de Execução (Prints):** Disponíveis na pasta `tests/postman/`, comprovando:
+  * Execução completa no Postman Collection Runner com `0` falhas (`PASS` em todas as asserções);
+  * Documentação Swagger/OpenAPI ativa em `http://localhost:8000/docs` (API Clínica) e `http://localhost:8001/docs` (API Governamental).

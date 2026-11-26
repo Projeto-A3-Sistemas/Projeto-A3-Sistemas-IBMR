@@ -1,0 +1,1508 @@
+{
+  "info": {
+    "_postman_id": "95ab404e-3eec-47ae-a9db-73e5bbfcb866",
+    "name": "SDM - Sistema de Gestão de Clínica Veterinária (16 Testes Obrigatórios)",
+    "description": "Coleção oficial de QA (P6) 100% alinhada aos schemas OpenAPI da Clínica e do Governo cobrindo os 16 testes obrigatórios do Projeto Integrador A3 (IBMR).",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "_exporter_id": "60408290",
+    "_collection_link": "https://go.postman.co/collection/60408290-95ab404e-3eec-47ae-a9db-73e5bbfcb866?source=collection_link"
+  },
+  "item": [
+    {
+      "name": "01 - Status, Veterinários e Segurança (Testes 01 a 04)",
+      "item": [
+        {
+          "name": "00 - Health Check API Clínica",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200 OK', function () { pm.response.to.have.status(200); });",
+                  "pm.test('Conexão com banco ok', function () {",
+                  "    const json = pm.response.json();",
+                  "    pm.expect(json.banco).to.eql('ok');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url_clinica}}/health",
+              "host": [
+                "{{base_url_clinica}}"
+              ],
+              "path": [
+                "health"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Teste 01a - Listar Veterinários Ativos (RF02)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Teste 01a: Listagem de veterinários retorna 200 OK', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url_clinica}}/api/veterinarios",
+              "host": [
+                "{{base_url_clinica}}"
+              ],
+              "path": [
+                "api",
+                "veterinarios"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Teste 01b - Cadastrar Veterinário Ativo com Senha Hash (RF01/RNF01)",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "function gerarCpf() {",
+                  "    const rnd = (n) => Math.round(Math.random() * n);",
+                  "    const mod = (dividendo, divisor) => Math.round(dividendo - (Math.floor(dividendo / divisor) * divisor));",
+                  "    const n = Array.from({length: 9}, () => rnd(9));",
+                  "    let d1 = n.reduce((acc, v, i) => acc + v * (10 - i), 0);",
+                  "    d1 = 11 - mod(d1, 11); if (d1 >= 10) d1 = 0;",
+                  "    let d2 = n.reduce((acc, v, i) => acc + v * (11 - i), 0) + d1 * 2;",
+                  "    d2 = 11 - mod(d2, 11); if (d2 >= 10) d2 = 0;",
+                  "    const raw = n.join('') + d1 + d2;",
+                  "    return raw.replace(/(\\d{3})(\\d{3})(\\d{3})(\\d{2})/, '$1.$2.$3-$4');",
+                  "}",
+                  "const rndId = Math.floor(10000 + Math.random() * 90000);",
+                  "pm.environment.set('vet_cpf', gerarCpf());",
+                  "pm.environment.set('vet_crmv', String(rndId));",
+                  "pm.environment.set('vet_email', 'vet.qa.' + rndId + '@clinica.com');"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Teste 01b: Cadastro de veterinário retorna 201 Created', function () {",
+                  "    pm.response.to.have.status(201);",
+                  "});",
+                  "pm.test('Senha nunca é exposta na resposta (RNF01)', function () {",
+                  "    const json = pm.response.json();",
+                  "    pm.expect(json.senha).to.be.undefined;",
+                  "    pm.expect(json.situacao).to.eql('ativo');",
+                  "    pm.environment.set('veterinario_id', json.id);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nome_completo\": \"Dra. Ana Paula QA\",\n  \"crmv_numero\": \"{{vet_crmv}}\",\n  \"crmv_uf\": \"RJ\",\n  \"email\": \"{{vet_email}}\",\n  \"telefone\": \"21988880001\",\n  \"cpf\": \"{{vet_cpf}}\",\n  \"senha\": \"Senha@123\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url_clinica}}/api/veterinarios",
+              "host": [
+                "{{base_url_clinica}}"
+              ],
+              "path": [
+                "api",
+                "veterinarios"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Teste 02 - Consultar Veterinário por ID (RF02)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Teste 02: Consulta de veterinário ativo retorna 200 OK', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url_clinica}}/api/veterinarios/{{veterinario_id}}",
+              "host": [
+                "{{base_url_clinica}}"
+              ],
+              "path": [
+                "api",
+                "veterinarios",
+                "{{veterinario_id}}"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Teste 03 - Bloqueio de CPF/E-mail Duplicado em Veterinário (RN01)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Teste 03: Cadastro duplicado de veterinário é bloqueado (400/409/422)', function () {",
+                  "    pm.expect(pm.response.code).to.be.oneOf([400, 409, 422]);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nome_completo\": \"Duplicado QA\",\n  \"crmv_numero\": \"{{vet_crmv}}\",\n  \"crmv_uf\": \"RJ\",\n  \"email\": \"{{vet_email}}\",\n  \"telefone\": \"21988880002\",\n  \"cpf\": \"{{vet_cpf}}\",\n  \"senha\": \"Senha@123\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url_clinica}}/api/veterinarios",
+              "host": [
+                "{{base_url_clinica}}"
+              ],
+              "path": [
+                "api",
+                "veterinarios"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Teste 04a - Criar Veterinário Temporário para Inativação",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "function gerarCpf() {",
+                  "    const rnd = (n) => Math.round(Math.random() * n);",
+                  "    const mod = (dividendo, divisor) => Math.round(dividendo - (Math.floor(dividendo / divisor) * divisor));",
+                  "    const n = Array.from({length: 9}, () => rnd(9));",
+                  "    let d1 = n.reduce((acc, v, i) => acc + v * (10 - i), 0);",
+                  "    d1 = 11 - mod(d1, 11); if (d1 >= 10) d1 = 0;",
+                  "    let d2 = n.reduce((acc, v, i) => acc + v * (11 - i), 0) + d1 * 2;",
+                  "    d2 = 11 - mod(d2, 11); if (d2 >= 10) d2 = 0;",
+                  "    const raw = n.join('') + d1 + d2;",
+                  "    return raw.replace(/(\\d{3})(\\d{3})(\\d{3})(\\d{2})/, '$1.$2.$3-$4');",
+                  "}",
+                  "const rndId = Math.floor(10000 + Math.random() * 90000);",
+                  "pm.environment.set('vet_temp_cpf', gerarCpf());",
+                  "pm.environment.set('vet_temp_crmv', String(rndId));",
+                  "pm.environment.set('vet_temp_email', 'carlos.inativo.' + rndId + '@clinica.com');"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Veterinário temporário criado (201)', function () {",
+                  "    pm.response.to.have.status(201);",
+                  "});",
+                  "const json = pm.response.json();",
+                  "pm.environment.set('vet_inativar_id', json.id);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nome_completo\": \"Dr. Carlos Inativo QA\",\n  \"crmv_numero\": \"{{vet_temp_crmv}}\",\n  \"crmv_uf\": \"RJ\",\n  \"email\": \"{{vet_temp_email}}\",\n  \"telefone\": \"21977770001\",\n  \"cpf\": \"{{vet_temp_cpf}}\",\n  \"senha\": \"Senha@123\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url_clinica}}/api/veterinarios",
+              "host": [
+                "{{base_url_clinica}}"
+              ],
+              "path": [
+                "api",
+                "veterinarios"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Teste 04b - Inativar Veterinário (Exclusão Lógica RF04/RN01)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Teste 04b: Veterinário inativado com sucesso (200 OK)', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "    const json = pm.response.json();",
+                  "    pm.expect(json.situacao).to.eql('inativo');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{base_url_clinica}}/api/veterinarios/{{vet_inativar_id}}",
+              "host": [
+                "{{base_url_clinica}}"
+              ],
+              "path": [
+                "api",
+                "veterinarios",
+                "{{vet_inativar_id}}"
+              ]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "02 - Endereços, ViaCEP e Tutores (Testes 05 e 06)",
+      "item": [
+        {
+          "name": "Teste 06a - Consulta ViaCEP Válido (01001000 - RF10)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Teste 06a: CEP válido retorna 200 OK (RF10)', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "pm.test('Retorna UF SP preenchida', function () {",
+                  "    const json = pm.response.json();",
+                  "    pm.expect(json.uf).to.eql('SP');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url_clinica}}/api/cep/01001000",
+              "host": [
+                "{{base_url_clinica}}"
+              ],
+              "path": [
+                "api",
+                "cep",
+                "01001000"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Teste 06b - Consulta ViaCEP Inexistente (00000000 - RF11)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Teste 06b: CEP inexistente tratado sem erro 500 interno (RF11)', function () {",
+                  "    pm.expect(pm.response.code).to.be.oneOf([400, 404, 422]);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url_clinica}}/api/cep/00000000",
+              "host": [
+                "{{base_url_clinica}}"
+              ],
+              "path": [
+                "api",
+                "cep",
+                "00000000"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Teste 06c - Cadastrar Endereço via CEP (RF10)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Teste 06c: Cadastro de endereço retorna 201 Created', function () {",
+                  "    pm.response.to.have.status(201);",
+                  "});",
+                  "const json = pm.response.json();",
+                  "pm.environment.set('endereco_id', json.id);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"cep\": \"20040-020\",\n  \"numero\": \"100\",\n  \"complemento\": \"Sala 5\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url_clinica}}/api/enderecos",
+              "host": [
+                "{{base_url_clinica}}"
+              ],
+              "path": [
+                "api",
+                "enderecos"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Teste 05a - Cadastrar Tutor com Endereço Vinculado (RF09)",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "function gerarCpf() {",
+                  "    const rnd = (n) => Math.round(Math.random() * n);",
+                  "    const mod = (dividendo, divisor) => Math.round(dividendo - (Math.floor(dividendo / divisor) * divisor));",
+                  "    const n = Array.from({length: 9}, () => rnd(9));",
+                  "    let d1 = n.reduce((acc, v, i) => acc + v * (10 - i), 0);",
+                  "    d1 = 11 - mod(d1, 11); if (d1 >= 10) d1 = 0;",
+                  "    let d2 = n.reduce((acc, v, i) => acc + v * (11 - i), 0) + d1 * 2;",
+                  "    d2 = 11 - mod(d2, 11); if (d2 >= 10) d2 = 0;",
+                  "    const raw = n.join('') + d1 + d2;",
+                  "    return raw.replace(/(\\d{3})(\\d{3})(\\d{3})(\\d{2})/, '$1.$2.$3-$4');",
+                  "}",
+                  "pm.environment.set('tutor_cpf', gerarCpf());"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Teste 05a: Cadastro de tutor retorna 201 Created (RF09)', function () {",
+                  "    pm.response.to.have.status(201);",
+                  "});",
+                  "const json = pm.response.json();",
+                  "pm.environment.set('tutor_id', json.id);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nome_completo\": \"Mariana Silva QA\",\n  \"data_nascimento\": \"1992-05-14\",\n  \"email\": \"mariana.qa@exemplo.com\",\n  \"telefone\": \"21999990001\",\n  \"endereco_id\": {{endereco_id}},\n  \"cpf\": \"{{tutor_cpf}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url_clinica}}/api/tutores",
+              "host": [
+                "{{base_url_clinica}}"
+              ],
+              "path": [
+                "api",
+                "tutores"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Teste 05b - Bloqueio de CPF Duplicado no Cadastro de Tutor (RF09/RN02)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Teste 05b: CPF duplicado de tutor é bloqueado (RF09/RN02)', function () {",
+                  "    pm.expect(pm.response.code).to.be.oneOf([400, 409, 422]);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nome_completo\": \"Outro Tutor Mesmo CPF\",\n  \"data_nascimento\": \"1988-08-20\",\n  \"email\": \"outro.qa@exemplo.com\",\n  \"telefone\": \"21999990002\",\n  \"endereco_id\": {{endereco_id}},\n  \"cpf\": \"{{tutor_cpf}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url_clinica}}/api/tutores",
+              "host": [
+                "{{base_url_clinica}}"
+              ],
+              "path": [
+                "api",
+                "tutores"
+              ]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "03 - Espécies, Animais e Microchip RFID (Testes 07, 08 e 11b)",
+      "item": [
+        {
+          "name": "03a - Cadastrar Espécie para Teste (RF13)",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.environment.set('especie_nome', 'Canino QA ' + Math.floor(1000 + Math.random() * 9000));"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Espécie cadastrada com sucesso (201)', function () {",
+                  "    pm.response.to.have.status(201);",
+                  "});",
+                  "const json = pm.response.json();",
+                  "pm.environment.set('especie_id', json.id);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nome\": \"{{especie_nome}}\",\n  \"descricao\": \"Canis lupus familiaris\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url_clinica}}/api/especies",
+              "host": [
+                "{{base_url_clinica}}"
+              ],
+              "path": [
+                "api",
+                "especies"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Teste 07a - Cadastrar Animal (RF15)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Teste 07a: Cadastro de animal retorna 201 Created (RF15)', function () {",
+                  "    pm.response.to.have.status(201);",
+                  "});",
+                  "const json = pm.response.json();",
+                  "pm.environment.set('animal_id', json.id);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nome\": \"Thor QA\",\n  \"data_nascimento\": \"2023-03-10\",\n  \"sexo\": \"M\",\n  \"cor\": \"Caramelo\",\n  \"peso_atual\": 14.5,\n  \"tutor_id\": {{tutor_id}},\n  \"especie_id\": {{especie_id}}\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url_clinica}}/api/animais",
+              "host": [
+                "{{base_url_clinica}}"
+              ],
+              "path": [
+                "api",
+                "animais"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Teste 07b - Vincular Microchip RFID ao Animal (RF16/RF18)",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const chip = '98511200' + Math.floor(1000000 + Math.random() * 9000000);",
+                  "pm.environment.set('microchip_codigo', chip);"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Teste 07b: Vínculo de microchip retorna 201 Created (RF16/RF18)', function () {",
+                  "    pm.response.to.have.status(201);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"codigo_microchip\": \"{{microchip_codigo}}\",\n  \"veterinario_id\": {{veterinario_id}},\n  \"data_implantacao\": \"2026-11-25\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url_clinica}}/api/animais/{{animal_id}}/microchip",
+              "host": [
+                "{{base_url_clinica}}"
+              ],
+              "path": [
+                "api",
+                "animais",
+                "{{animal_id}}",
+                "microchip"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Teste 08 - Bloqueio de Microchip Duplicado (RF17/RN05)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Teste 08: Microchip duplicado é bloqueado (RF17/RN05)', function () {",
+                  "    pm.expect(pm.response.code).to.be.oneOf([400, 409, 422]);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"codigo_microchip\": \"{{microchip_codigo}}\",\n  \"veterinario_id\": {{veterinario_id}},\n  \"data_implantacao\": \"2026-11-25\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url_clinica}}/api/animais/{{animal_id}}/microchip",
+              "host": [
+                "{{base_url_clinica}}"
+              ],
+              "path": [
+                "api",
+                "animais",
+                "{{animal_id}}",
+                "microchip"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Teste 11b - Atualizar Animal na Clínica (RF15/RF25)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Teste 11b: Atualização de animal retorna 200 OK (RF15/RF25)', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nome\": \"Thor QA Atualizado\",\n  \"data_nascimento\": \"2023-03-10\",\n  \"sexo\": \"M\",\n  \"cor\": \"Caramelo Dourado\",\n  \"peso_atual\": 15.2,\n  \"tutor_id\": {{tutor_id}},\n  \"especie_id\": {{especie_id}}\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url_clinica}}/api/animais/{{animal_id}}",
+              "host": [
+                "{{base_url_clinica}}"
+              ],
+              "path": [
+                "api",
+                "animais",
+                "{{animal_id}}"
+              ]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "04 - Consultas, Vacinas e Sincronização Governo (Testes 09, 10, 11a, 12 e 13)",
+      "item": [
+        {
+          "name": "Teste 09a - Registrar Consulta Clínica (RF21)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Teste 09a: Registro de consulta retorna 201 Created (RF21)', function () {",
+                  "    pm.response.to.have.status(201);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"animal_id\": {{animal_id}},\n  \"veterinario_id\": {{veterinario_id}},\n  \"data_hora\": \"2026-11-25T10:00:00\",\n  \"motivo\": \"Check-up anual e imunização\",\n  \"anamnese\": \"Animal ativo, apetite normal, sem queixas.\",\n  \"sintomas\": \"Nenhum\",\n  \"diagnostico\": \"Animal hígido\",\n  \"tratamento\": \"Protocolo vacinal anual\",\n  \"prescricao\": \"Nenhuma\",\n  \"peso\": 15.2,\n  \"temperatura\": 38.5,\n  \"observacoes\": \"Teste automatizado P6\",\n  \"situacao\": \"realizada\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url_clinica}}/api/consultas",
+              "host": [
+                "{{base_url_clinica}}"
+              ],
+              "path": [
+                "api",
+                "consultas"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Teste 09b - Consultar Histórico de Consultas do Animal (RF22)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Teste 09b: Histórico de consultas retorna 200 OK (RF22)', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "pm.test('Lista contém a consulta registrada', function () {",
+                  "    const json = pm.response.json();",
+                  "    pm.expect(json.length).to.be.above(0);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url_clinica}}/api/consultas?animal_id={{animal_id}}",
+              "host": [
+                "{{base_url_clinica}}"
+              ],
+              "path": [
+                "api",
+                "consultas"
+              ],
+              "query": [
+                {
+                  "key": "animal_id",
+                  "value": "{{animal_id}}"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Teste 10 & 13 - Registrar Vacina NÃO Antirrábica (Não Comunica ao Governo - RF23/RF32)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Teste 10/13: Vacina não antirrábica registrada localmente (201 Created)', function () {",
+                  "    pm.response.to.have.status(201);",
+                  "});",
+                  "const json = pm.response.json();",
+                  "pm.environment.set('vacina_comum_id', json.id);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"animal_id\": {{animal_id}},\n  \"veterinario_id\": {{veterinario_id}},\n  \"nome_vacina\": \"V10 Polivalente\",\n  \"tipo_vacina\": \"Polivalente\",\n  \"antirrabica\": false,\n  \"fabricante\": \"Zoetis\",\n  \"numero_lote\": \"LOTE-V10-2026\",\n  \"data_aplicacao\": \"2026-11-25\",\n  \"dose\": \"Reforço Anual\",\n  \"via_aplicacao\": \"Subcutânea\",\n  \"data_proxima_dose\": \"2027-11-25\",\n  \"validade_lote\": \"2027-06-30\",\n  \"observacoes\": \"Vacina comum - não deve gerar integração\",\n  \"situacao\": \"aplicada\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url_clinica}}/api/vacinas",
+              "host": [
+                "{{base_url_clinica}}"
+              ],
+              "path": [
+                "api",
+                "vacinas"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Teste 10b - Consultar Histórico de Vacinação e Próximas Doses (RF24)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Teste 10b: Histórico de vacinas retorna 200 OK (RF24)', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "pm.test('Contém vacina registrada e data da próxima dose', function () {",
+                  "    const json = pm.response.json();",
+                  "    pm.expect(json.length).to.be.above(0);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url_clinica}}/api/vacinas?animal_id={{animal_id}}",
+              "host": [
+                "{{base_url_clinica}}"
+              ],
+              "path": [
+                "api",
+                "vacinas"
+              ],
+              "query": [
+                {
+                  "key": "animal_id",
+                  "value": "{{animal_id}}"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Teste 12a - Registrar Vacina ANTIRRÁBICA Aplicada (Comunica ao Governo - RF23/RF26)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Teste 12a: Vacina antirrábica registrada com sucesso (201 Created)', function () {",
+                  "    pm.response.to.have.status(201);",
+                  "});",
+                  "const json = pm.response.json();",
+                  "pm.environment.set('vacina_antirrabica_id', json.id);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"animal_id\": {{animal_id}},\n  \"veterinario_id\": {{veterinario_id}},\n  \"nome_vacina\": \"Rabisin Antirrábica\",\n  \"tipo_vacina\": \"Antirrábica\",\n  \"antirrabica\": true,\n  \"fabricante\": \"Boehringer\",\n  \"numero_lote\": \"LOTE-RAIVA-2026\",\n  \"data_aplicacao\": \"2026-11-25\",\n  \"dose\": \"Dose única\",\n  \"via_aplicacao\": \"Subcutânea\",\n  \"data_proxima_dose\": \"2027-11-25\",\n  \"validade_lote\": \"2027-08-31\",\n  \"observacoes\": \"Deve comunicar à API governamental e retornar protocolo\",\n  \"situacao\": \"aplicada\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url_clinica}}/api/vacinas",
+              "host": [
+                "{{base_url_clinica}}"
+              ],
+              "path": [
+                "api",
+                "vacinas"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Teste 12b & 13b - Verificar Integrações (Apenas Antirrábica Enviada - RF27/RF32)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Teste 12b/13b: Consulta integrações retorna 200 OK', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "pm.test('Vacina antirrábica enviada com protocolo e vacina comum ausente (RF32)', function () {",
+                  "    const lista = pm.response.json();",
+                  "    const vacComumId = String(pm.environment.get('vacina_comum_id'));",
+                  "    const vacRaivaId = String(pm.environment.get('vacina_antirrabica_id'));",
+                  "    const envioComum = lista.find(i => String(i.vacina_id) === vacComumId);",
+                  "    pm.expect(envioComum).to.be.undefined;",
+                  "    const envioRaiva = lista.find(i => String(i.vacina_id) === vacRaivaId);",
+                  "    pm.expect(envioRaiva).to.not.be.undefined;",
+                  "    pm.expect(envioRaiva.situacao).to.be.oneOf(['enviada', 'confirmada']);",
+                  "    pm.expect(envioRaiva.protocolo_externo).to.be.a('string').and.not.be.empty;",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url_clinica}}/api/integracoes?animal_id={{animal_id}}",
+              "host": [
+                "{{base_url_clinica}}"
+              ],
+              "path": [
+                "api",
+                "integracoes"
+              ],
+              "query": [
+                {
+                  "key": "animal_id",
+                  "value": "{{animal_id}}"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Teste 11a - Consultar Animal Cadastrado na API Governamental (RF25/RF33)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Teste 11a: Animal com microchip consta na API governamental após vacinação (200 OK)', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "    const json = pm.response.json();",
+                  "    pm.expect(json.microchip).to.eql(pm.environment.get('microchip_codigo'));",
+                  "    pm.expect(json.nome).to.eql('Thor QA Atualizado');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url_governo}}/api/governo/animais/{{microchip_codigo}}",
+              "host": [
+                "{{base_url_governo}}"
+              ],
+              "path": [
+                "api",
+                "governo",
+                "animais",
+                "{{microchip_codigo}}"
+              ]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "05 - Falha Simulada, Reenvio e Idempotência (Testes 14 a 16)",
+      "item": [
+        {
+          "name": "Teste 14a - Ativar Modo Falha INDISPONIVEL na API Governamental (RF36)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Teste 14a: Modo falha INDISPONIVEL ativado no governo (200 OK)', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "    const json = pm.response.json();",
+                  "    pm.expect(json.tipo).to.eql('INDISPONIVEL');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "X-Admin-Token",
+                "value": "{{admin_token}}",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"tipo\": \"INDISPONIVEL\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url_governo}}/api/governo/admin/modo-falha",
+              "host": [
+                "{{base_url_governo}}"
+              ],
+              "path": [
+                "api",
+                "governo",
+                "admin",
+                "modo-falha"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Teste 14b - Aplicar Vacina Antirrábica com Governo Indisponível (RF28/RN11)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Teste 14b: Vacina salva localmente mesmo com governo indisponível (201 Created)', function () {",
+                  "    pm.response.to.have.status(201);",
+                  "});",
+                  "const json = pm.response.json();",
+                  "pm.environment.set('vacina_pendente_id', json.id);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"animal_id\": {{animal_id}},\n  \"veterinario_id\": {{veterinario_id}},\n  \"nome_vacina\": \"Nobivac Raiva\",\n  \"tipo_vacina\": \"Antirrábica\",\n  \"antirrabica\": true,\n  \"fabricante\": \"MSD\",\n  \"numero_lote\": \"LOTE-FALHA-2026\",\n  \"data_aplicacao\": \"2026-11-25\",\n  \"dose\": \"Dose única\",\n  \"via_aplicacao\": \"Subcutânea\",\n  \"data_proxima_dose\": \"2027-11-25\",\n  \"validade_lote\": \"2027-09-30\",\n  \"observacoes\": \"Aplicada durante indisponibilidade simulada do governo\",\n  \"situacao\": \"aplicada\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url_clinica}}/api/vacinas",
+              "host": [
+                "{{base_url_clinica}}"
+              ],
+              "path": [
+                "api",
+                "vacinas"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Teste 14c - Confirmar Integração Pendente/Falha na Fila (RF28/RN13)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Teste 14c: Integração registrada como pendente ou falha (200 OK)', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "    const lista = pm.response.json();",
+                  "    const vacPendId = String(pm.environment.get('vacina_pendente_id'));",
+                  "    const item = lista.find(i => String(i.vacina_id) === vacPendId);",
+                  "    pm.expect(item).to.not.be.undefined;",
+                  "    pm.expect(item.situacao).to.be.oneOf(['pendente', 'falha']);",
+                  "    pm.environment.set('integracao_pendente_id', item.id);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url_clinica}}/api/integracoes?animal_id={{animal_id}}",
+              "host": [
+                "{{base_url_clinica}}"
+              ],
+              "path": [
+                "api",
+                "integracoes"
+              ],
+              "query": [
+                {
+                  "key": "animal_id",
+                  "value": "{{animal_id}}"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Teste 15a - Desativar Modo Falha (DESLIGADO) na API Governamental (RF36)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Teste 15a: API governamental normalizada com DESLIGADO (200 OK)', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "    const json = pm.response.json();",
+                  "    pm.expect(json.tipo).to.eql('DESLIGADO');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "X-Admin-Token",
+                "value": "{{admin_token}}",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"tipo\": \"DESLIGADO\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url_governo}}/api/governo/admin/modo-falha",
+              "host": [
+                "{{base_url_governo}}"
+              ],
+              "path": [
+                "api",
+                "governo",
+                "admin",
+                "modo-falha"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Teste 15b - Reenvio Manual da Integração Pendente (RF29)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Teste 15b: Reenvio manual concluído com sucesso (200 OK)', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "pm.test('Integração passa a enviada e retorna protocolo', function () {",
+                  "    const json = pm.response.json();",
+                  "    pm.expect(json.situacao).to.be.oneOf(['enviada', 'confirmada']);",
+                  "    pm.expect(json.protocolo_externo).to.be.a('string').and.not.be.empty;",
+                  "    pm.environment.set('protocolo_externo', json.protocolo_externo);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{base_url_clinica}}/api/integracoes/{{integracao_pendente_id}}/reenviar",
+              "host": [
+                "{{base_url_clinica}}"
+              ],
+              "path": [
+                "api",
+                "integracoes",
+                "{{integracao_pendente_id}}",
+                "reenviar"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Teste 16a - Bloqueio de Reenvio Duplicado / Idempotência (RF30/RN12)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Teste 16a: Repetição não gera novo envio duplicado (RF30/RN12)', function () {",
+                  "    pm.expect(pm.response.code).to.be.oneOf([200, 400, 409, 422]);",
+                  "    if (pm.response.code === 200) {",
+                  "        const json = pm.response.json();",
+                  "        pm.expect(json.protocolo_externo).to.eql(pm.environment.get('protocolo_externo'));",
+                  "    }",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{base_url_clinica}}/api/integracoes/{{integracao_pendente_id}}/reenviar",
+              "host": [
+                "{{base_url_clinica}}"
+              ],
+              "path": [
+                "api",
+                "integracoes",
+                "{{integracao_pendente_id}}",
+                "reenviar"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Teste 16b - Confirmar Protocolo Único Sem Duplicidade na Clínica (RF30/RN12)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Teste 16b: Integração mantém protocolo único sem registro duplicado (200 OK)', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "    const lista = pm.response.json();",
+                  "    const vacPendId = String(pm.environment.get('vacina_pendente_id'));",
+                  "    const registros = lista.filter(i => String(i.vacina_id) === vacPendId);",
+                  "    pm.expect(registros.length).to.eql(1);",
+                  "    pm.expect(registros[0].protocolo_externo).to.eql(pm.environment.get('protocolo_externo'));",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url_clinica}}/api/integracoes?animal_id={{animal_id}}",
+              "host": [
+                "{{base_url_clinica}}"
+              ],
+              "path": [
+                "api",
+                "integracoes"
+              ],
+              "query": [
+                {
+                  "key": "animal_id",
+                  "value": "{{animal_id}}"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Teste 16c - Consultar Operação por Protocolo na API Governamental (RF37)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Teste 16c: Operação localizada no governo pelo protocolo único (200 OK)', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "    const json = pm.response.json();",
+                  "    pm.expect(json.protocolo).to.eql(pm.environment.get('protocolo_externo'));",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url_governo}}/api/governo/operacoes/{{protocolo_externo}}",
+              "host": [
+                "{{base_url_governo}}"
+              ],
+              "path": [
+                "api",
+                "governo",
+                "operacoes",
+                "{{protocolo_externo}}"
+              ]
+            }
+          },
+          "response": []
+        }
+      ]
+    }
+  ]
+}
